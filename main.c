@@ -33,7 +33,7 @@ static size_t read_file(const char *filename, char **content) {
         *content = malloc((stream_size + 1) * sizeof(char));
 
         if (*content == NULL) {
-            fprintf(stderr, "could not open allocate memory enough: %s\n", strerror(errno));
+            fprintf(stderr, "could not allocate memory enough: %s\n", strerror(errno));
             exit(1);
         }
 
@@ -59,6 +59,7 @@ typedef enum {
     AK_ADD = 1,
     AK_REMOVE,
     AK_VIEW,
+    AK_GET,
 } ArgumentKind;
 
 typedef struct {
@@ -680,12 +681,13 @@ static void display_lines(Line *lines, char *padding) {
 static void usage(FILE *stream, const char *program_name, char *error_message, ...) {
     va_list args;
 
-    fprintf(stream, "%s [add|remove|-h]\n", program_name);
+    fprintf(stream, "%s [add|remove|get|view|help]\n", program_name);
     fprintf(stream, "\n");
     fprintf(stream, "    add    [filename]           add a new file to the tracking system\n");
     fprintf(stream, "    remove [filename]           remove a file from the tracking system\n");
+    fprintf(stream, "    get    [filename]           get specific file\n");
     fprintf(stream, "    view                        view files\n");
-    fprintf(stream, "    -h                          display this message\n");
+    fprintf(stream, "    help                        display this message\n");
 
     if (error_message != NULL) {
         va_start(args, error_message);
@@ -982,6 +984,34 @@ static int view_action() {
     return 0;
 }
 
+static int get_action(const char *program_name, const char *filename) {
+    char *abs_path = realpath(filename, NULL);
+
+    if (abs_path == NULL) {
+        fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
+
+        return 1;
+    }
+
+    Database database = load_database();
+
+    if (!filepath_exists_on_database(&database, abs_path)) {
+        fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", filename);
+        fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, filename);
+        return 1;
+    }
+
+    char *content;
+
+    Line *lines = compile_file(abs_path, &content);
+
+    display_lines(lines, "");
+
+    free_database(&database);
+    
+    return 0;
+}
+
 int main(int argc, char **argv) {
     Arguments args = {0};
 
@@ -990,7 +1020,7 @@ int main(int argc, char **argv) {
     char *arg;
 
     while ((arg = shift(&argc, &argv)) != NULL) {
-        if (arg_cmp(arg, "-h")) {
+        if (arg_cmp(arg, "help")) {
             usage(stdout, program_name, NULL);
 
             return 0;
@@ -998,7 +1028,7 @@ int main(int argc, char **argv) {
             const char *value = shift(&argc, &argv);
 
             if (value == NULL) {
-                usage(stderr, program_name, "option \"add\" expects a filename");
+                usage(stderr, program_name, "option \"%s\" expects a filename", arg);
 
                 return 1;
             }
@@ -1009,7 +1039,7 @@ int main(int argc, char **argv) {
             const char *value = shift(&argc, &argv);
 
             if (value == NULL) {
-                usage(stderr, program_name, "option \"remove\" expects a filename");
+                usage(stderr, program_name, "option \"%s\" expects a filename", arg);
 
                 return 1;
             }
@@ -1018,11 +1048,22 @@ int main(int argc, char **argv) {
             args.value = value;
         } else if (arg_cmp(arg, "view")) {
             args.kind = AK_VIEW;
+        } else if (arg_cmp(arg, "get")) {
+            const char *value = shift(&argc, &argv);
+
+            if (value == NULL) {
+                usage(stderr, program_name, "the option \"%s\" expects a filename", arg);
+
+                return 1;
+            }
+
+            args.kind = AK_GET;
+            args.value = value;
         } else {
             if (*arg == '-') {
                 usage(stderr, program_name, "flag %s does not exists", arg);
             } else {
-                usage(stderr, program_name, "option %s does not exists", arg);
+                usage(stderr, program_name, "option \"%s\" does not exists", arg);
             }
 
             return 1;
@@ -1033,6 +1074,7 @@ int main(int argc, char **argv) {
         case AK_ADD: return add_action(args.value);
         case AK_REMOVE: return remove_action(args.value);
         case AK_VIEW: return view_action();
+        case AK_GET: return get_action(program_name, args.value);
         default:
             usage(stderr, program_name, NULL);
             return 1;
