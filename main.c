@@ -10,6 +10,7 @@
 #include <wchar.h>
 #include <locale.h>
 #include <sys/wait.h>
+#include <time.h>
 
 #define DB_FILENAME ".wodo.db"
 #define MAX_FILENAME_SIZE 255
@@ -98,6 +99,7 @@ typedef enum {
     AK_VIEW,
     AK_GET,
     AK_OPEN,
+    AK_TODAY,
 } ArgumentKind;
 
 typedef struct {
@@ -442,18 +444,25 @@ typedef enum {
 
 typedef struct {
     char hour[2];
+    int hour_value;
     char minute[2];
+    int minute_value;
 } Time;
 
 typedef struct {
     char day[2];
+    int day_value;
     char month[2];
+    int month_value;
     char year[2];
+    int year_value;
 } Date;
 
 typedef struct Line Line;
 
 struct Line {
+    int indent;
+
     State state;
     Week_Day week_day;
 
@@ -723,15 +732,15 @@ static Date parse_date(Parser *parser) {
     expect_kind(parser, TK_SEP);
     Token *yeart = expect_kind(parser, TK_NUMBER);
 
-    parse_month_day(dayt->value, dayt->value_size);
+    date.day_value = parse_month_day(dayt->value, dayt->value_size);
     date.day[0] = dayt->value[0];
     date.day[1] = dayt->value[1];
 
-    parse_month(montht->value, montht->value_size);
+    date.month_value = parse_month(montht->value, montht->value_size);
     date.month[0] = montht->value[0];
     date.month[1] = montht->value[1];
 
-    parse_year(yeart->value, yeart->value_size);
+    date.year_value = parse_year(yeart->value, yeart->value_size);
     date.year[0] = yeart->value[0];
     date.year[1] = yeart->value[1];
 
@@ -745,11 +754,11 @@ static Time parse_time(Parser *parser) {
     expect_kind(parser, TK_COLON);
     Token *minutet = expect_kind(parser, TK_NUMBER);
 
-    parse_hour(hourt->value, hourt->value_size);
+    time.hour_value = parse_hour(hourt->value, hourt->value_size);
     time.hour[0] = hourt->value[0];
     time.hour[1] = hourt->value[1];
 
-    parse_minute(minutet->value, minutet->value_size);
+    time.minute_value = parse_minute(minutet->value, minutet->value_size);
     time.minute[0] = minutet->value[0];
     time.minute[1] = minutet->value[1];
 
@@ -760,6 +769,12 @@ static Line *parse_line(Parser *parser) {
     Line *line = malloc(sizeof(Line));
 
     line->next = NULL;
+
+    if (parser->tokens != NULL && parser->tokens->kind == TK_SPACE) {
+        Token *indent = consume_token(parser);
+
+        line->indent = indent->value_size;
+    }
 
     // parse text
     Token *text = expect_kind(parser, TK_TEXT);
@@ -834,53 +849,89 @@ static Line *compile_file(const char *filepath, char **content) {
 
 // ---------------------------------------- Data View Start ----------------------------------------
 
+static void display_line(Line *line, char *padding, size_t max_string_size) {
+    printf("%s%*.s", padding, line->indent, "");
+    printf("%.*s    %*.s", (int)line->text_size, line->text, (int)(max_string_size - line->text_size - line->indent), "");
+
+    switch (line->week_day) {
+        case WD_SUNDAY:    printf("Sunday   "); break;
+        case WD_MONDAY:    printf("Monday   "); break;
+        case WD_TUESDAY:   printf("Tuesday  "); break;
+        case WD_WEDNESDAY: printf("Wednesday"); break;
+        case WD_THURSDAY:  printf("Thursday "); break;
+        case WD_FRIDAY:    printf("Friday   "); break;
+        case WD_SATURDAY:  printf("Saturday "); break;
+    }
+
+    printf(" ");
+
+    printf("%c%c", line->date.day[0], line->date.day[1]);
+    printf("-");
+    printf("%c%c", line->date.month[0], line->date.month[1]);
+    printf("-");
+    printf("%c%c", line->date.year[0], line->date.year[1]);
+    printf(" ");
+
+    printf("%c%c:%c%c - %c%c:%c%c",
+            line->start.hour[0], line->start.hour[1],
+            line->start.minute[0], line->start.minute[1],
+            line->end.hour[0], line->end.hour[1],
+            line->end.minute[0], line->end.minute[1]);
+
+    printf(" ");
+
+    switch (line->state) {
+        case S_TODO: printf("Todo"); break;
+        case S_IN_PROGRESS: printf("Doing"); break;
+        case S_DONE: printf("Done"); break;
+    }
+
+    printf("\n");
+}
+
 static void display_lines(Line *lines, char *padding) {
     size_t max_string_size = 0;
 
     for (Line *line = lines; line != NULL; line = line->next) {
-        if (line->text_size > max_string_size)
-            max_string_size = line->text_size;
+        size_t size = line->text_size + line->indent;
+
+        if (size > max_string_size)
+            max_string_size = size;
     }
 
     for (Line *line = lines; line != NULL; line = line->next) {
-        printf("%s", padding);
-        printf("%.*s    %*.s", (int)line->text_size, line->text, (int)(max_string_size - line->text_size), "");
-
-        switch (line->week_day) {
-            case WD_SUNDAY:    printf("Sunday   "); break;
-            case WD_MONDAY:    printf("Monday   "); break;
-            case WD_TUESDAY:   printf("Tuesday  "); break;
-            case WD_WEDNESDAY: printf("Wednesday"); break;
-            case WD_THURSDAY:  printf("Thursday "); break;
-            case WD_FRIDAY:    printf("Friday   "); break;
-            case WD_SATURDAY:  printf("Saturday "); break;
-        }
-
-        printf(" ");
-
-        printf("%c%c", line->date.day[0], line->date.day[1]);
-        printf("-");
-        printf("%c%c", line->date.month[0], line->date.month[1]);
-        printf("-");
-        printf("%c%c", line->date.year[0], line->date.year[1]);
-        printf(" ");
-
-        printf("%c%c:%c%c - %c%c:%c%c",
-                line->start.hour[0], line->start.hour[1],
-                line->start.minute[0], line->start.minute[1],
-                line->end.hour[0], line->end.hour[1],
-                line->end.minute[0], line->end.minute[1]);
-
-        printf(" ");
-
-        switch (line->state) {
-            case S_TODO: printf("Todo"); break;
-            case S_IN_PROGRESS: printf("Doing"); break;
-            case S_DONE: printf("Done"); break;
-        }
-
-        printf("\n");
+        display_line(line, padding, max_string_size);
     }
+}
+
+static int display_today_lines(Line *lines, char *padding) {
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+
+    // Extract day, month, and year
+    int day = tm.tm_mday;    // Day of the month (1-31)
+    int month = tm.tm_mon + 1; // Month (0-11), so add 1
+    int year = tm.tm_year + 1900; // Year since 1900, so add 1900
+
+    size_t max_string_size = 0;
+
+    for (Line *line = lines; line != NULL; line = line->next) {
+        size_t size = line->text_size + line->indent;
+
+        if (size > max_string_size)
+            max_string_size = size;
+    }
+
+    int count = 0;
+
+    for (Line *line = lines; line != NULL; line = line->next) {
+        if (line->date.day_value == day && line->date.month_value == month && line->date.year_value + 2000 == year) {
+            display_line(line, padding, max_string_size);
+            count++;
+        }
+    }
+
+    return count;
 }
 
 // ---------------------------------------- Data View End ----------------------------------------
@@ -888,13 +939,14 @@ static void display_lines(Line *lines, char *padding) {
 static void usage(FILE *stream, const char *program_name, char *error_message, ...) {
     va_list args;
 
-    fprintf(stream, "%s [add|remove|get|view|open|help]\n", program_name);
+    fprintf(stream, "%s [add|remove|get|today|view|open|help]\n", program_name);
     fprintf(stream, "\n");
     fprintf(stream, "    add     a    [filename]           add a new file to the tracking system\n");
     fprintf(stream, "    remove  r    [filename|id]        remove a file from the tracking system\n");
     fprintf(stream, "    get     g    [filename|id]        get specific file by path or id\n");
     fprintf(stream, "    open    o    [filename|id]        open a file using vim by path or id\n");
     fprintf(stream, "    view    v                         view files\n");
+    fprintf(stream, "    today   t                         view today tasks\n");
     fprintf(stream, "    help    h                         display this message\n");
 
     if (error_message != NULL) {
@@ -1066,6 +1118,44 @@ static int view_action() {
     }
     printf("\n");
 
+    free_database(&database);
+
+    return 0;
+}
+static int today_action() {
+    Database database = load_database();
+
+    if (database.size == 0) {
+        printf("There is no file yet\n");
+
+        return 0;
+    }
+
+    printf("Today tasks:\n\n");
+
+    for (DbFile *file = database.head; file != NULL; file = file->next) {
+        printf("    [ID:%ld] %s\n", file->id, file->filepath);
+
+        char *content;
+
+        Line *lines = compile_file(file->filepath, &content);
+
+        printf("\n");
+        if (display_today_lines(lines, "        ") == 0) {
+            printf("        There is not task for today is this list\n");
+        }
+
+        if (file->next != NULL) {
+            printf("\n");
+        }
+        
+        free(content);
+    }
+
+    printf("\n");
+
+    free_database(&database);
+
     return 0;
 }
 
@@ -1229,6 +1319,8 @@ int main(int argc, char **argv) {
 
             args.kind = AK_OPEN;
             args.value = value;
+        } else if (arg_cmp(arg, "today", "t")) {
+            args.kind = AK_TODAY;
         } else {
             if (*arg == '-') {
                 usage(stderr, program_name, "flag %s does not exists", arg);
@@ -1246,6 +1338,7 @@ int main(int argc, char **argv) {
         case AK_VIEW: return view_action();
         case AK_GET: return get_action(program_name, args.value);
         case AK_OPEN: return open_action(program_name, args.value);
+        case AK_TODAY: return today_action();
         default:
             usage(stderr, program_name, NULL);
             return 1;
