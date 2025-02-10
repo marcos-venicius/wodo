@@ -100,6 +100,7 @@ typedef enum {
     AK_GET,
     AK_OPEN,
     AK_TODAY,
+    AK_LIST,
 } ArgumentKind;
 
 typedef struct {
@@ -941,13 +942,14 @@ static int display_today_lines(Line *lines, char *padding) {
 static void usage(FILE *stream, const char *program_name, char *error_message, ...) {
     va_list args;
 
-    fprintf(stream, "%s [add|remove|get|today|view|open|help]\n", program_name);
+    fprintf(stream, "%s [option] [arguments]\n", program_name);
     fprintf(stream, "\n");
     fprintf(stream, "    add     a    [filename]           add a new file to the tracking system\n");
     fprintf(stream, "    remove  r    [filename|id]        remove a file from the tracking system\n");
     fprintf(stream, "    get     g    [filename|id]        get specific file by path or id\n");
     fprintf(stream, "    open    o    [filename|id]        open a file using vim by path or id\n");
     fprintf(stream, "    view    v                         view files\n");
+    fprintf(stream, "    list    l                         list files\n");
     fprintf(stream, "    today   t                         view today tasks\n");
     fprintf(stream, "    help    h                         display this message\n");
 
@@ -1124,6 +1126,7 @@ static int view_action() {
 
     return 0;
 }
+
 static int today_action() {
     Database database = load_database();
 
@@ -1155,6 +1158,17 @@ static int today_action() {
     }
 
     printf("\n");
+
+    free_database(&database);
+
+    return 0;
+}
+
+static int list_action() {
+    Database database = load_database();
+
+    for (DbFile *file = database.head; file != NULL; file = file->next)
+        printf("[ID:%ld] %s\n", file->id, file->filepath);
 
     free_database(&database);
 
@@ -1323,6 +1337,8 @@ int main(int argc, char **argv) {
             args.value = value;
         } else if (arg_cmp(arg, "today", "t")) {
             args.kind = AK_TODAY;
+        } else if (arg_cmp(arg, "list", "l")) {
+            args.kind = AK_LIST;
         } else {
             if (*arg == '-') {
                 usage(stderr, program_name, "flag %s does not exists", arg);
@@ -1341,6 +1357,7 @@ int main(int argc, char **argv) {
         case AK_GET: return get_action(program_name, args.value);
         case AK_OPEN: return open_action(program_name, args.value);
         case AK_TODAY: return today_action();
+        case AK_LIST: return list_action();
         default:
             usage(stderr, program_name, NULL);
             return 1;
