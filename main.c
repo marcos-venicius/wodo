@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <wchar.h>
 #include <locale.h>
+#include <sys/wait.h>
 
 #define DB_FILENAME ".wodo.db"
 #define MAX_FILENAME_SIZE 255
@@ -92,6 +93,7 @@ typedef enum {
     AK_REMOVE,
     AK_VIEW,
     AK_GET,
+    AK_OPEN,
 } ArgumentKind;
 
 typedef struct {
@@ -879,11 +881,12 @@ static void display_lines(Line *lines, char *padding) {
 static void usage(FILE *stream, const char *program_name, char *error_message, ...) {
     va_list args;
 
-    fprintf(stream, "%s [add|remove|get|view|help]\n", program_name);
+    fprintf(stream, "%s [add|remove|get|view|open|help]\n", program_name);
     fprintf(stream, "\n");
     fprintf(stream, "    add     a    [filename]           add a new file to the tracking system\n");
     fprintf(stream, "    remove  r    [filename|id]        remove a file from the tracking system\n");
     fprintf(stream, "    get     g    [filename|id]        get specific file by path or id\n");
+    fprintf(stream, "    open    o    [filename|id]        open a file using vim by path or id\n");
     fprintf(stream, "    view    v                         view files\n");
     fprintf(stream, "    help    h                         display this message\n");
 
@@ -1111,6 +1114,56 @@ static int get_action(const char *program_name, const char *file_identifier) {
     return 0;
 }
 
+static void open_vim_at(const char *filepath) {
+    pid_t pid = fork();
+
+    if (pid == 0) {
+        execlp("vim", "vim", filepath, (char *)NULL);
+    } else {
+        wait(NULL);
+    }
+}
+
+static int open_action(const char *program_name, const char *file_identifier) {
+    if (is_number(file_identifier)) {
+        size_t id = strtoul(file_identifier, NULL, 10);
+
+        Database database = load_database();
+
+        const DbFile *file = get_database_file_by_id(&database, id);
+
+        if (file == NULL) {
+            fprintf(stderr, "\033[1;31merror:\033[0m there is no file with id %s in the database\n", file_identifier);
+            return 1;
+        }
+
+        open_vim_at(file->filepath);
+
+        free_database(&database);
+        return 0;
+    }
+
+    char *abs_path = realpath(file_identifier, NULL);
+
+    if (abs_path == NULL) {
+        fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
+
+        return 1;
+    }
+
+    Database database = load_database();
+
+    if (!filepath_exists_on_database(&database, abs_path)) {
+        fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", file_identifier);
+        fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, file_identifier);
+        return 1;
+    }
+
+    open_vim_at(abs_path);
+
+    return 0;
+}
+
 int main(int argc, char **argv) {
     Arguments args = {0};
 
@@ -1158,6 +1211,17 @@ int main(int argc, char **argv) {
 
             args.kind = AK_GET;
             args.value = value;
+        } else if (arg_cmp(arg, "open", "o")) {
+            const char *value = shift(&argc, &argv);
+
+            if (value == NULL) {
+                usage(stderr, program_name, "the option \"%s\" expects a filename", arg);
+
+                return 1;
+            }
+
+            args.kind = AK_OPEN;
+            args.value = value;
         } else {
             if (*arg == '-') {
                 usage(stderr, program_name, "flag %s does not exists", arg);
@@ -1174,6 +1238,7 @@ int main(int argc, char **argv) {
         case AK_REMOVE: return remove_action(args.value);
         case AK_VIEW: return view_action();
         case AK_GET: return get_action(program_name, args.value);
+        case AK_OPEN: return open_action(program_name, args.value);
         default:
             usage(stderr, program_name, NULL);
             return 1;
