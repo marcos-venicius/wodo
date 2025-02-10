@@ -86,6 +86,10 @@ static bool is_number(const char *string) {
     return true;
 }
 
+static inline bool is_symbol(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
 // ---------------------------------------- Utils End ----------------------------------------
 
 typedef enum {
@@ -120,7 +124,9 @@ typedef struct {
 typedef enum {
     TK_TEXT = 0,    // any text like: x, Todo, or "Lesson 011 sdlk", ...
     TK_SPACE,       // just spaces
-    TK_SYMBOL,      // - [ ] , | :
+    TK_SEP,         // default separator
+    TK_SYMBOL,      // symbols Like week days
+    TK_COLON,       // hour separator
     TK_NUMBER,      // 0123456789
     TK_BR,          // line break
 } Token_Kind;
@@ -327,10 +333,6 @@ static inline bool is_digit(char chr) {
     return chr >= '0' && chr <= '9';
 }
 
-static inline bool is_text(char chr) {
-    return (chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z');
-}
-
 static inline void advance_cursor(Lexer *lexer) {
     if (lexer->cursor < lexer->content_size) lexer->cursor++;
 }
@@ -358,7 +360,7 @@ static void tokenize_space(Lexer *lexer) {
 }
 
 static void tokenize_symbol(Lexer *lexer) {
-    advance_cursor(lexer);
+    while (is_symbol(chr(lexer))) advance_cursor(lexer);
 
     save_token(lexer, TK_SYMBOL);
 }
@@ -369,6 +371,12 @@ static void tokenize_br(Lexer *lexer) {
     save_token(lexer, TK_BR);
 }
 
+static void tokenize_single(Lexer *lexer, Token_Kind kind) {
+    advance_cursor(lexer);
+
+    save_token(lexer, kind);
+}
+
 static void tokenize_number(Lexer *lexer) {
     while (is_digit(chr(lexer))) advance_cursor(lexer);
 
@@ -376,7 +384,9 @@ static void tokenize_number(Lexer *lexer) {
 }
 
 static void tokenize_text(Lexer *lexer) {
-    while (is_text(chr(lexer))) advance_cursor(lexer);
+    do advance_cursor(lexer); while (chr(lexer) != '"');
+
+    advance_cursor(lexer);
 
     save_token(lexer, TK_TEXT);
 }
@@ -387,17 +397,17 @@ static Token *tokenize(Lexer *lexer) {
 
         switch (chr(lexer)) {
             case ' ': tokenize_space(lexer); break;
-            case '-': case '[':
-            case ']': case '|':
-            case ',': case ':': tokenize_symbol(lexer); break;
+            case '"': tokenize_text(lexer); break;
+            case '-': tokenize_single(lexer, TK_SEP); break;
+            case ':': tokenize_single(lexer, TK_COLON); break;
             case '0': case '1': case '2':
             case '3': case '4': case '5':
             case '6': case '7': case '8':
             case '9': tokenize_number(lexer); break;
             case '\n': tokenize_br(lexer); break;
             default: {
-                if (is_text(chr(lexer))) {
-                    tokenize_text(lexer);
+                if (is_symbol(chr(lexer))) {
+                    tokenize_symbol(lexer);
                     break;
                 }
 
@@ -435,12 +445,19 @@ typedef struct {
     char minute[2];
 } Time;
 
+typedef struct {
+    char day[2];
+    char month[2];
+    char year[2];
+} Date;
+
 typedef struct Line Line;
 
 struct Line {
     State state;
     Week_Day week_day;
-    char day[2];
+
+    Date date;
     Time start;
     Time end;
 
@@ -510,7 +527,44 @@ static int parse_char_to_number(char n) {
     return 0;
 }
 
-static int parse_month_day(const char *string) {
+static int parse_year(const char *year, size_t size) {
+    if (size != 2) {
+        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. invalid year format %.*s\n", (int)size, year);
+        exit(1);
+    }
+
+    char a = parse_char_to_number(year[0]);
+    char b = parse_char_to_number(year[1]);
+
+
+    return a * 10 + b;
+}
+
+static int parse_month(const char *month, size_t size) {
+    if (size != 2) {
+        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. invalid month format %.*s\n", (int)size, month);
+        exit(1);
+    }
+
+    char a = parse_char_to_number(month[0]);
+    char b = parse_char_to_number(month[1]);
+
+    int n = a * 10 + b;
+
+    if (n < 1 || n > 12) {
+        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. invalid month %.*s\n", (int)size, month);
+        exit(1);
+    }
+
+    return n;
+}
+
+static int parse_month_day(const char *string, size_t size) {
+    if (size != 2) {
+        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. invalid day format %.*s\n", (int)size, string);
+        exit(1);
+    }
+
     char a = string[0];
     char b = string[1];
 
@@ -542,7 +596,12 @@ static int parse_month_day(const char *string) {
     return v;
 }
 
-static int parse_hour(const char *string) {
+static int parse_hour(const char *string, size_t size) {
+    if (size != 2) {
+        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. invalid hour format %.*s\n", (int)size, string);
+        exit(1);
+    }
+
     char a = string[0];
     char b = string[1];
 
@@ -563,7 +622,12 @@ static int parse_hour(const char *string) {
     return an * 10 + bn;
 }
 
-static int parse_minute(const char *string) {
+static int parse_minute(const char *string, size_t size) {
+    if (size != 2) {
+        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. invalid minute format %.*s\n", (int)size, string);
+        exit(1);
+    }
+
     char a = string[0];
     char b = string[1];
 
@@ -600,17 +664,6 @@ static Token *expect_kind(Parser *parser, Token_Kind kind) {
     return token;
 }
 
-static Token *expect_text(Token *token, char *text) {
-    size_t len = strlen(text);
-
-    if (token->value_size != len || !cmp_sized_strings(text, token->value, len, token->value_size)) {
-        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. unexpected token value \"%.*s\"\n", (int)token->value_size, token->value);
-        exit(1);
-    }
-
-    return token;
-}
-
 static Token *consume_token(Parser *parser) {
     if (parser->tokens == NULL) return NULL;
 
@@ -621,176 +674,123 @@ static Token *consume_token(Parser *parser) {
     return token;
 }
 
+static Week_Day parse_week_day(const char *sized_string, size_t size) {
+    if (cmp_sized_strings(sunday, sized_string, sunday_size, size)) {
+        return WD_SUNDAY;
+    } else if (cmp_sized_strings(monday, sized_string, monday_size, size)) {
+        return WD_MONDAY;
+    } else if (cmp_sized_strings(tuesday, sized_string, tuesday_size, size)) {
+        return WD_TUESDAY;
+    } else if (cmp_sized_strings(wednesday, sized_string, wednesday_size, size)) {
+        return WD_WEDNESDAY;
+    } else if (cmp_sized_strings(thursday, sized_string, thursday_size, size)) {
+        return WD_THURSDAY;
+    } else if (cmp_sized_strings(friday, sized_string, friday_size, size)) {
+        return WD_FRIDAY;
+    } else if (cmp_sized_strings(saturday, sized_string, saturday_size, size)) {
+        return WD_SATURDAY;
+    } else {
+        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. unrecognized week day \"%.*s\"\n", (int)size, sized_string);
+        exit(1);
+    }
+
+    return -1;
+}
+
+static State parse_state(Parser *parser) {
+    Token *statet = expect_kind(parser, TK_SYMBOL);
+
+    if (cmp_sized_strings(todo, statet->value, todo_size, statet->value_size)) {
+        return S_TODO;
+    } else if (cmp_sized_strings(in_progress, statet->value, in_progress_size, statet->value_size)) {
+        return S_IN_PROGRESS;
+    } else if (cmp_sized_strings(done, statet->value, done_size, statet->value_size)) {
+        return S_DONE;
+    } else {
+        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. unrecognized state \"%.*s\"\n", (int)statet->value_size, statet->value);
+        exit(1);
+    }
+
+    return -1;
+}
+
+static Date parse_date(Parser *parser) {
+    Date date = {0};
+
+    Token *dayt = expect_kind(parser, TK_NUMBER);
+    expect_kind(parser, TK_SEP);
+    Token *montht = expect_kind(parser, TK_NUMBER);
+    expect_kind(parser, TK_SEP);
+    Token *yeart = expect_kind(parser, TK_NUMBER);
+
+    parse_month_day(dayt->value, dayt->value_size);
+    date.day[0] = dayt->value[0];
+    date.day[1] = dayt->value[1];
+
+    parse_month(montht->value, montht->value_size);
+    date.month[0] = montht->value[0];
+    date.month[1] = montht->value[1];
+
+    parse_year(yeart->value, yeart->value_size);
+    date.year[0] = yeart->value[0];
+    date.year[1] = yeart->value[1];
+
+    return date;
+}
+
+static Time parse_time(Parser *parser) {
+    Time time = {0};
+
+    Token *hourt = expect_kind(parser, TK_NUMBER);
+    expect_kind(parser, TK_COLON);
+    Token *minutet = expect_kind(parser, TK_NUMBER);
+
+    parse_hour(hourt->value, hourt->value_size);
+    time.hour[0] = hourt->value[0];
+    time.hour[1] = hourt->value[1];
+
+    parse_minute(minutet->value, minutet->value_size);
+    time.minute[0] = minutet->value[0];
+    time.minute[1] = minutet->value[1];
+
+    return time;
+}
+
 static Line *parse_line(Parser *parser) {
     Line *line = malloc(sizeof(Line));
 
     line->next = NULL;
 
-    expect_text(expect_kind(parser, TK_SYMBOL), "-");
-    expect_text(expect_kind(parser, TK_SPACE), " ");
-    expect_text(expect_kind(parser, TK_SYMBOL), "[");
-
-    Token *token = consume_token(parser);
-
-    if (token->kind == TK_SPACE) {
-        expect_text(token, " ");
-    } else if (token->kind == TK_TEXT) {
-        expect_text(token, "x");
-    } else {
-        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. unexpected token value \"%.*s\"\n", (int)token->value_size, token->value);
-        exit(1);
-    }
-
-    expect_text(expect_kind(parser, TK_SYMBOL), "]");
-    expect_text(expect_kind(parser, TK_SPACE), " ");
-
+    // parse text
     Token *text = expect_kind(parser, TK_TEXT);
-    size_t text_size = text->value_size;
-    Token *next = parser->tokens;
 
-    while (next != NULL) {
-        if (next->kind == TK_BR) {
-            fprintf(stderr, "\033[1;31merror\033[0m invalid file format. unexpected line break\n");
-            exit(1);
-        }
-
-        Token *post_next = next->next;
-
-        if (next->kind == TK_SPACE && post_next->kind == TK_SYMBOL && cmp_sized_strings(post_next->value, "|", post_next->value_size, 1)) break;
-
-        text_size += next->value_size;
-
-        next = parser->tokens = parser->tokens->next;
-    }
-
-    line->text = text->value;
-    line->text_size = text_size + next->value_size;
+    line->text = text->value + 1;
+    line->text_size = text->value_size - 2;
 
     expect_kind(parser, TK_SPACE);
-    expect_text(expect_kind(parser, TK_SYMBOL), "|");
-    expect_text(expect_kind(parser, TK_SPACE), " ");
 
-    Token *week_day = expect_kind(parser, TK_TEXT);
+    // parse week day
+    Token *weekday = expect_kind(parser, TK_SYMBOL);
 
-    if (cmp_sized_strings(week_day->value, sunday, week_day->value_size, sunday_size)) {
-        line->week_day = WD_SUNDAY;
-    } else if (cmp_sized_strings(week_day->value, monday, week_day->value_size, monday_size)) {
-        line->week_day = WD_MONDAY;
-    } else if (cmp_sized_strings(week_day->value, tuesday, week_day->value_size, tuesday_size)) {
-        line->week_day = WD_TUESDAY;
-    } else if (cmp_sized_strings(week_day->value, wednesday, week_day->value_size, wednesday_size)) {
-        line->week_day = WD_WEDNESDAY;
-    } else if (cmp_sized_strings(week_day->value, thursday, week_day->value_size, thursday_size)) {
-        line->week_day = WD_THURSDAY;
-    } else if (cmp_sized_strings(week_day->value, friday, week_day->value_size, friday_size)) {
-        line->week_day = WD_FRIDAY;
-    } else if (cmp_sized_strings(week_day->value, saturday, week_day->value_size, saturday_size)) {
-        line->week_day = WD_SATURDAY;
-    } else {
-        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. unexpected week day \"%.*s\"\n", (int)week_day->value_size, week_day->value);
-        exit(1);
-    }
+    line->week_day = parse_week_day(weekday->value, weekday->value_size);
 
     expect_kind(parser, TK_SPACE);
-    Token *day = expect_kind(parser, TK_NUMBER);
 
-    if (day->value_size != 2)  {
-        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. invalid month day %.*s\n", (int)day->value_size, day->value);
-        exit(1);
-    }
-
-    parse_month_day(day->value);
-
-    line->day[0] = day->value[0];
-    line->day[1] = day->value[1];
-
-    expect_text(expect_kind(parser, TK_SYMBOL), ",");
-    expect_kind(parser, TK_SPACE);
-
-    // parse start hour
-
-    Time start;
-
-    Token *hs = expect_kind(parser, TK_NUMBER);
-
-    if (hs->value_size != 2)  {
-        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. invalid start hour %.*s\n", (int)hs->value_size, hs->value);
-        exit(1);
-    }
-
-    parse_hour(hs->value);
-
-    start.hour[0] = hs->value[0];
-    start.hour[1] = hs->value[1];
-
-    expect_text(expect_kind(parser, TK_SYMBOL), ":");
-
-    Token *ms = expect_kind(parser, TK_NUMBER);
-
-    if (ms->value_size != 2)  {
-        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. invalid start minute %.*s\n", (int)ms->value_size, ms->value);
-        exit(1);
-    }
-
-    parse_minute(ms->value);
-
-    start.minute[0] = ms->value[0];
-    start.minute[1] = ms->value[1];
-
-    line->start = start;
+    line->date = parse_date(parser);
 
     expect_kind(parser, TK_SPACE);
-    expect_text(expect_kind(parser, TK_SYMBOL), "-");
-    expect_kind(parser, TK_SPACE);
 
-    // parse end hour
+    line->start = parse_time(parser);
 
-    Time end;
+    if (parser->tokens != NULL && parser->tokens->kind == TK_SPACE) consume_token(parser);
+    expect_kind(parser, TK_SEP);
+    if (parser->tokens != NULL && parser->tokens->kind == TK_SPACE) consume_token(parser);
 
-    Token *he = expect_kind(parser, TK_NUMBER);
-
-    if (he->value_size != 2)  {
-        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. invalid end hour %.*s\n", (int)he->value_size, he->value);
-        exit(1);
-    }
-
-    parse_hour(he->value);
-
-    end.hour[0] = he->value[0];
-    end.hour[1] = he->value[1];
-
-    expect_text(expect_kind(parser, TK_SYMBOL), ":");
-
-    Token *me = expect_kind(parser, TK_NUMBER);
-
-    if (me->value_size != 2)  {
-        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. invalid end minute %.*s\n", (int)me->value_size, me->value);
-        exit(1);
-    }
-
-    parse_minute(me->value);
-
-    end.minute[0] = me->value[0];
-    end.minute[1] = me->value[1];
-
-    line->end = end;
+    line->end = parse_time(parser);
 
     expect_kind(parser, TK_SPACE);
-    expect_text(expect_kind(parser, TK_SYMBOL), "-");
-    expect_kind(parser, TK_SPACE);
 
-    Token *state = expect_kind(parser, TK_TEXT);
-
-    if (cmp_sized_strings(state->value, todo, state->value_size, todo_size)) {
-        line->state = S_TODO;
-    } else if (cmp_sized_strings(state->value, in_progress, state->value_size, in_progress_size)) {
-        line->state = S_IN_PROGRESS;
-    } else if (cmp_sized_strings(state->value, done, state->value_size, done_size)) {
-        line->state = S_DONE;
-    } else {
-        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. invalid state %.*s\n", (int)state->value_size, state->value);
-        exit(1);
-    }
+    line->state = parse_state(parser);
 
     return line;
 }
@@ -835,36 +835,43 @@ static Line *compile_file(const char *filepath, char **content) {
 // ---------------------------------------- Data View Start ----------------------------------------
 
 static void display_lines(Line *lines, char *padding) {
+    size_t max_string_size = 0;
+
+    for (Line *line = lines; line != NULL; line = line->next) {
+        if (line->text_size > max_string_size)
+            max_string_size = line->text_size;
+    }
+
     for (Line *line = lines; line != NULL; line = line->next) {
         printf("%s", padding);
-        printf("- [");
-        if (line->state == S_DONE) {
-            printf("x");
-        } else {
-            printf(" ");
-        }
-
-        printf("] ");
-
-        printf("%.*s | ", (int)line->text_size, line->text);
+        printf("%.*s    %*.s", (int)line->text_size, line->text, (int)(max_string_size - line->text_size), "");
 
         switch (line->week_day) {
-            case WD_SUNDAY:    printf("Sunday    "); break;
-            case WD_MONDAY:    printf("Monday    "); break;
-            case WD_TUESDAY:   printf("Tuesday   "); break;
-            case WD_WEDNESDAY: printf("Wednesday "); break;
-            case WD_THURSDAY:  printf("Thursday  "); break;
-            case WD_FRIDAY:    printf("Friday    "); break;
-            case WD_SATURDAY:  printf("Saturday  "); break;
+            case WD_SUNDAY:    printf("Sunday   "); break;
+            case WD_MONDAY:    printf("Monday   "); break;
+            case WD_TUESDAY:   printf("Tuesday  "); break;
+            case WD_WEDNESDAY: printf("Wednesday"); break;
+            case WD_THURSDAY:  printf("Thursday "); break;
+            case WD_FRIDAY:    printf("Friday   "); break;
+            case WD_SATURDAY:  printf("Saturday "); break;
         }
 
-        printf("%c%c, ", line->day[0], line->day[1]);
+        printf(" ");
 
-        printf("%c%c:%c%c - %c%c:%c%c - ",
+        printf("%c%c", line->date.day[0], line->date.day[1]);
+        printf("-");
+        printf("%c%c", line->date.month[0], line->date.month[1]);
+        printf("-");
+        printf("%c%c", line->date.year[0], line->date.year[1]);
+        printf(" ");
+
+        printf("%c%c:%c%c - %c%c:%c%c",
                 line->start.hour[0], line->start.hour[1],
                 line->start.minute[0], line->start.minute[1],
                 line->end.hour[0], line->end.hour[1],
                 line->end.minute[0], line->end.minute[1]);
+
+        printf(" ");
 
         switch (line->state) {
             case S_TODO: printf("Todo"); break;
