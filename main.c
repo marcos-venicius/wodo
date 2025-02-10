@@ -774,6 +774,8 @@ static Line *parse_line(Parser *parser) {
         Token *indent = consume_token(parser);
 
         line->indent = indent->value_size;
+    } else {
+        line->indent = 0;
     }
 
     // parse text
