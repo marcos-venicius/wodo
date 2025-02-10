@@ -662,9 +662,9 @@ static Line *parse_line(Parser *parser) {
     }
 
     line->text = text->value;
-    line->text_size = text_size;
+    line->text_size = text_size + next->value_size;
 
-    expect_text(expect_kind(parser, TK_SPACE), " ");
+    expect_kind(parser, TK_SPACE);
     expect_text(expect_kind(parser, TK_SYMBOL), "|");
     expect_text(expect_kind(parser, TK_SPACE), " ");
 
@@ -1047,6 +1047,10 @@ static int view_action() {
 
         printf("\n");
         display_lines(lines, "        ");
+
+        if (file->next != NULL) {
+            printf("\n");
+        }
         
         free(content);
     }
