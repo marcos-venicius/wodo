@@ -8,7 +8,6 @@
 #include <pwd.h>
 #include <assert.h>
 #include <wchar.h>
-#include <wctype.h>
 #include <locale.h>
 
 #define DB_FILENAME ".wodo.db"
@@ -53,6 +52,39 @@ static size_t read_file(const char *filename, char **content) {
     return stream_size;
 }
 
+static bool file_exists(const char *filepath) {
+    return access(filepath, F_OK) == 0;
+}
+
+static const char *get_user_home_folder() {
+    const char *home = getenv("HOME");
+
+    if (home == NULL) return getpwuid(getuid())->pw_dir;
+
+    return home;
+}
+
+static bool compare_paths(const char *a, const char *b) {
+    size_t i = 0;
+
+    while (i < MAX_FILENAME_SIZE) {
+        if (a[i] != b[i]) return false;
+
+        if (a[i] == '\0' && b[i] == '\0') return true;
+
+        i++;
+    }
+
+    return false;
+}
+
+static bool is_number(const char *string) {
+    for (size_t i = 0; string[i] != '\0'; ++i)
+        if (!(string[i] >= '0' && string[i] <= '9')) return false;
+
+    return true;
+}
+
 // ---------------------------------------- Utils End ----------------------------------------
 
 typedef enum {
@@ -70,12 +102,14 @@ typedef struct {
 typedef struct DbFile DbFile;
 
 struct DbFile {
+    size_t id;
     char *filepath;
 
     DbFile *next;
 };
 
 typedef struct {
+    size_t last_id;
     size_t size;
     DbFile *head;
     DbFile *tail;
@@ -107,6 +141,170 @@ typedef struct {
     Token *head;
     Token *tail;
 } Lexer;
+
+// ---------------------------------------- Database Start ----------------------------------------
+
+static const char *get_database_filepath() {
+    const char *user_home_folder = get_user_home_folder();
+
+    static char database_filepath[DB_FILEPATH_MAX_BUFFER];
+
+    snprintf(database_filepath, sizeof(database_filepath), "%s/%s", user_home_folder, DB_FILENAME);
+
+    return database_filepath;
+}
+
+static void load_filepath_on_database(Database *database, char *filepath, size_t id) {
+    DbFile *file = malloc(sizeof(DbFile));
+
+    if (file == NULL) {
+        fprintf(stderr, "ERROR: could not load file \"%s\" to database: %s\n", filepath, strerror(errno));
+        exit(1);
+    }
+
+    file->id = id;
+    file->filepath = strdup(filepath);
+
+    if (file->filepath == NULL) {
+        fprintf(stderr, "ERROR: could not allocate memory for file path: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    file->next = NULL;
+
+    if (database->head == NULL) {
+        database->head = file;
+        database->tail = file;
+    } else {
+        database->tail = database->tail->next = file;
+    }
+}
+
+static Database load_database() {
+    const char *database_filepath = get_database_filepath();
+
+    Database database = {0};
+
+    if (file_exists(database_filepath)) {
+        FILE *file = fopen(database_filepath, "rb");
+
+        if (file == NULL) {
+            fprintf(stderr, "could not open database file: %s\n", strerror(errno));
+            exit(1);
+        }
+
+        fread(&database.size, sizeof(size_t), 1, file);
+        fread(&database.last_id, sizeof(size_t), 1, file);
+
+        for (size_t i = 0; i < database.size; ++i) {
+            size_t filepath_size;
+            size_t id;
+
+            fread(&id, sizeof(size_t), 1, file);
+            fread(&filepath_size, sizeof(size_t), 1, file);
+
+            char *filepath = malloc(filepath_size);
+
+            if (filepath == NULL) {
+                fprintf(stderr, "coult not allocate %ld byte for db file path: %s\n", filepath_size, strerror(errno));
+                exit(1);
+            }
+
+            fread(filepath, sizeof(char), filepath_size, file);
+
+            load_filepath_on_database(&database, filepath, id);
+
+            free(filepath);
+        }
+    }
+
+    return database;
+}
+
+static void save_database(Database *database) {
+    const char *database_filepath = get_database_filepath();
+
+    FILE *file = fopen(database_filepath, "wb");
+
+    if (file == NULL) {
+        fprintf(stderr, "could not open database file: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    fwrite(&database->size, sizeof(size_t), 1, file);
+    fwrite(&database->last_id, sizeof(size_t), 1, file);
+
+    for (DbFile *db_file = database->head; db_file != NULL; db_file = db_file->next) {
+        size_t filepath_size = strlen(db_file->filepath) + 1;
+
+        fwrite(&db_file->id, sizeof(size_t), 1, file);
+        fwrite(&filepath_size, sizeof(size_t), 1, file);
+        fwrite(db_file->filepath, sizeof(char), filepath_size, file);
+    }
+
+    fclose(file);
+}
+
+static size_t gen_id(Database *database) {
+    return ++database->last_id;
+}
+
+static void free_database(Database *database) {
+    DbFile *file = database->head;
+
+    while (file != NULL) {
+        DbFile *next = file->next;
+
+        free(file->filepath);
+        free(file);
+
+        file = next;
+    }
+}
+
+static bool filepath_exists_on_database(Database *database, const char *filepath) {
+    for (DbFile *file = database->head; file != NULL; file = file->next)
+        if (compare_paths(filepath, file->filepath)) return true;
+
+    return false;
+}
+
+static DbFile *get_database_file_by_id(const Database *database, size_t id) {
+    for (DbFile *file = database->head; file != NULL; file = file->next)
+        if (file->id == id) return file;
+
+    return NULL;
+}
+
+static void add_file_to_database(Database *database, const char *filepath) {
+    DbFile *file = malloc(sizeof(DbFile));
+
+    if (file == NULL) {
+        fprintf(stderr, "ERROR: could not add file \"%s\" to database: %s\n", filepath, strerror(errno));
+        exit(1);
+    }
+
+    file->filepath = strdup(filepath);
+
+    if (file->filepath == NULL) {
+        fprintf(stderr, "ERROR: could not allocate memory for file path: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    file->id = gen_id(database);
+    file->next = NULL;
+
+    if (database->head == NULL) {
+        database->head = file;
+        database->tail = file;
+    } else {
+        database->tail = database->tail->next = file;
+    }
+
+    database->size++;
+}
+
+// ---------------------------------------- Database End ----------------------------------------
 
 // ---------------------------------------- Lexer Start ----------------------------------------
 
@@ -683,11 +881,11 @@ static void usage(FILE *stream, const char *program_name, char *error_message, .
 
     fprintf(stream, "%s [add|remove|get|view|help]\n", program_name);
     fprintf(stream, "\n");
-    fprintf(stream, "    add    [filename]           add a new file to the tracking system\n");
-    fprintf(stream, "    remove [filename]           remove a file from the tracking system\n");
-    fprintf(stream, "    get    [filename]           get specific file\n");
-    fprintf(stream, "    view                        view files\n");
-    fprintf(stream, "    help                        display this message\n");
+    fprintf(stream, "    add     a    [filename]           add a new file to the tracking system\n");
+    fprintf(stream, "    remove  r    [filename|id]        remove a file from the tracking system\n");
+    fprintf(stream, "    get     g    [filename|id]        get specific file by path or id\n");
+    fprintf(stream, "    view    v                         view files\n");
+    fprintf(stream, "    help    h                         display this message\n");
 
     if (error_message != NULL) {
         va_start(args, error_message);
@@ -708,176 +906,8 @@ static char *shift(int *argc, char ***argv) {
     return *((*argv)++);
 }
 
-static inline bool arg_cmp(const char *actual, const char *expected) {
-    return strncmp(actual, expected, strlen(actual)) == 0;
-}
-
-static const char *get_user_home_folder() {
-    const char *home = getenv("HOME");
-
-    if (home == NULL) return getpwuid(getuid())->pw_dir;
-
-    return home;
-}
-
-static bool file_exists(const char *filepath) {
-    return access(filepath, F_OK) == 0;
-}
-
-static const char *get_database_filepath() {
-    const char *user_home_folder = get_user_home_folder();
-
-    static char database_filepath[DB_FILEPATH_MAX_BUFFER];
-
-    snprintf(database_filepath, sizeof(database_filepath), "%s/%s", user_home_folder, DB_FILENAME);
-
-    return database_filepath;
-}
-
-static void add_file_to_database(Database *database, const char *filepath) {
-    DbFile *file = malloc(sizeof(DbFile));
-
-    if (file == NULL) {
-        fprintf(stderr, "ERROR: could not add file \"%s\" to database: %s\n", filepath, strerror(errno));
-        exit(1);
-    }
-
-    file->filepath = strdup(filepath);
-
-    if (file->filepath == NULL) {
-        fprintf(stderr, "ERROR: could not allocate memory for file path: %s\n", strerror(errno));
-        exit(1);
-    }
-
-    file->next = NULL;
-
-    if (database->head == NULL) {
-        database->head = file;
-        database->tail = file;
-    } else {
-        database->tail = database->tail->next = file;
-    }
-
-    database->size++;
-}
-
-static void free_database(Database *database) {
-    DbFile *file = database->head;
-
-    while (file != NULL) {
-        DbFile *next = file->next;
-
-        free(file->filepath);
-        free(file);
-
-        file = next;
-    }
-}
-
-static void load_filepath_on_database(Database *database, char *filepath) {
-    DbFile *file = malloc(sizeof(DbFile));
-
-    if (file == NULL) {
-        fprintf(stderr, "ERROR: could not load file \"%s\" to database: %s\n", filepath, strerror(errno));
-        exit(1);
-    }
-
-    file->filepath = strdup(filepath);
-
-    if (file->filepath == NULL) {
-        fprintf(stderr, "ERROR: could not allocate memory for file path: %s\n", strerror(errno));
-        exit(1);
-    }
-
-    file->next = NULL;
-
-    if (database->head == NULL) {
-        database->head = file;
-        database->tail = file;
-    } else {
-        database->tail = database->tail->next = file;
-    }
-}
-
-static Database load_database() {
-    const char *database_filepath = get_database_filepath();
-
-    Database database = {0};
-
-    if (file_exists(database_filepath)) {
-        FILE *file = fopen(database_filepath, "rb");
-
-        if (file == NULL) {
-            fprintf(stderr, "could not open database file: %s\n", strerror(errno));
-            exit(1);
-        }
-
-        fread(&database.size, sizeof(size_t), 1, file);
-
-        for (size_t i = 0; i < database.size; ++i) {
-            size_t filepath_size;
-
-            fread(&filepath_size, sizeof(size_t), 1, file);
-
-            char *filepath = malloc(filepath_size);
-
-            if (filepath == NULL) {
-                fprintf(stderr, "coult not allocate %ld byte for db file path: %s\n", filepath_size, strerror(errno));
-                exit(1);
-            }
-
-            fread(filepath, sizeof(char), filepath_size, file);
-
-            load_filepath_on_database(&database, filepath);
-
-            free(filepath);
-        }
-    }
-
-    return database;
-}
-
-static bool compare_paths(const char *a, const char *b) {
-    size_t i = 0;
-
-    while (i < MAX_FILENAME_SIZE) {
-        if (a[i] != b[i]) return false;
-
-        if (a[i] == '\0' && b[i] == '\0') return true;
-
-        i++;
-    }
-
-    return false;
-}
-
-static bool filepath_exists_on_database(Database *database, const char *filepath) {
-    for (DbFile *file = database->head; file != NULL; file = file->next)
-        if (compare_paths(filepath, file->filepath)) return true;
-
-    return false;
-}
-
-static void save_database(Database *database) {
-    const char *database_filepath = get_database_filepath();
-
-    FILE *file = fopen(database_filepath, "wb");
-
-    if (file == NULL) {
-        fprintf(stderr, "could not open database file: %s\n", strerror(errno));
-        exit(1);
-    }
-
-    fwrite(&database->size, sizeof(size_t), 1, file);
-
-    for (DbFile *db_file = database->head; db_file != NULL; db_file = db_file->next) {
-        size_t filepath_size = strlen(db_file->filepath) + 1;
-
-        fwrite(&filepath_size, sizeof(size_t), 1, file);
-        fwrite(db_file->filepath, sizeof(char), filepath_size, file);
-    }
-
-    fclose(file);
+static inline bool arg_cmp(const char *actual, const char *expected, const char *alternative) {
+    return strncmp(actual, expected, strlen(actual)) == 0 || strncmp(actual, alternative, strlen(actual)) == 0;
 }
 
 static int add_action(const char *filename) {
@@ -911,10 +941,50 @@ static int add_action(const char *filename) {
     return 0;
 }
 
-static int remove_action(const char *filename) {
+// `file_identifier` can be an Id or the path to the file
+static int remove_action(const char *file_identifier) {
+    if (is_number(file_identifier)) {
+        size_t id = strtoul(file_identifier, NULL, 10);
+
+        Database database = load_database();
+
+        // TODO: abstract this to a function
+        DbFile *slow = NULL;
+        DbFile *fast = database.head;
+
+        while (fast != NULL) {
+            if (fast->id == id) {
+                if (slow == NULL) {
+                    database.head = fast->next;
+                } else {
+                    slow->next = fast->next;
+                }
+
+                if (database.tail == fast) {
+                    database.tail = slow;
+                }
+
+                free(fast->filepath);
+                free(fast);
+
+                database.size--;
+
+                break;
+            }
+
+            slow = fast;
+            fast = fast->next;
+        }
+
+        save_database(&database);
+        free_database(&database);
+
+        return 0;
+    }
+
     Database database = load_database();
 
-    char *abs_path = realpath(filename, NULL);
+    char *abs_path = realpath(file_identifier, NULL);
 
     if (abs_path == NULL) {
         fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
@@ -922,6 +992,7 @@ static int remove_action(const char *filename) {
         return 1;
     }
 
+    // TODO: abstract this to a function
     DbFile *slow = NULL;
     DbFile *fast = database.head;
 
@@ -968,7 +1039,7 @@ static int view_action() {
     printf("Files:\n\n");
 
     for (DbFile *file = database.head; file != NULL; file = file->next) {
-        printf("    %s\n", file->filepath);
+        printf("    [ID:%ld] %s\n", file->id, file->filepath);
 
         char *content;
 
@@ -984,8 +1055,32 @@ static int view_action() {
     return 0;
 }
 
-static int get_action(const char *program_name, const char *filename) {
-    char *abs_path = realpath(filename, NULL);
+// `file_identifier` can be an Id or the path to the file
+static int get_action(const char *program_name, const char *file_identifier) {
+    if (is_number(file_identifier)) {
+        size_t id = strtoul(file_identifier, NULL, 10);
+
+        Database database = load_database();
+
+        const DbFile *file = get_database_file_by_id(&database, id);
+
+        if (file == NULL) {
+            fprintf(stderr, "\033[1;31merror:\033[0m there is no file with id %s in the database\n", file_identifier);
+            return 1;
+        }
+
+        char *content;
+
+        Line *lines = compile_file(file->filepath, &content);
+
+        display_lines(lines, "");
+
+        free_database(&database);
+
+        return 0;
+    }
+
+    char *abs_path = realpath(file_identifier, NULL);
 
     if (abs_path == NULL) {
         fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
@@ -996,8 +1091,8 @@ static int get_action(const char *program_name, const char *filename) {
     Database database = load_database();
 
     if (!filepath_exists_on_database(&database, abs_path)) {
-        fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", filename);
-        fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, filename);
+        fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", file_identifier);
+        fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, file_identifier);
         return 1;
     }
 
@@ -1020,11 +1115,11 @@ int main(int argc, char **argv) {
     char *arg;
 
     while ((arg = shift(&argc, &argv)) != NULL) {
-        if (arg_cmp(arg, "help")) {
+        if (arg_cmp(arg, "help", "h")) {
             usage(stdout, program_name, NULL);
 
             return 0;
-        } else if (arg_cmp(arg, "add")) {
+        } else if (arg_cmp(arg, "add", "a")) {
             const char *value = shift(&argc, &argv);
 
             if (value == NULL) {
@@ -1035,7 +1130,7 @@ int main(int argc, char **argv) {
 
             args.kind = AK_ADD;
             args.value = value;
-        } else if (arg_cmp(arg, "remove")) {
+        } else if (arg_cmp(arg, "remove", "r")) {
             const char *value = shift(&argc, &argv);
 
             if (value == NULL) {
@@ -1046,9 +1141,9 @@ int main(int argc, char **argv) {
 
             args.kind = AK_REMOVE;
             args.value = value;
-        } else if (arg_cmp(arg, "view")) {
+        } else if (arg_cmp(arg, "view", "v")) {
             args.kind = AK_VIEW;
-        } else if (arg_cmp(arg, "get")) {
+        } else if (arg_cmp(arg, "get", "g")) {
             const char *value = shift(&argc, &argv);
 
             if (value == NULL) {
