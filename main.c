@@ -328,7 +328,7 @@ static Lexer create_lexer(const char *content, size_t content_size) {
     };
 }
 
-static char chr(Lexer *lexer) {
+static inline char chr(Lexer *lexer) {
     return lexer->content[lexer->cursor];
 }
 
@@ -395,7 +395,7 @@ static void tokenize_text(Lexer *lexer) {
 }
 
 static Token *tokenize(Lexer *lexer) {
-    while (lexer->cursor < lexer->content_size) {
+    while (lexer->cursor < lexer->content_size && chr(lexer) != '\0') {
         lexer->bot = lexer->cursor;
 
         switch (chr(lexer)) {
@@ -476,6 +476,8 @@ struct Line {
 
     Line *next;
 };
+
+typedef bool (*LineFilterPredicate)(Line *line);
 
 typedef struct {
     Line *head;
@@ -832,14 +834,58 @@ static Line *parse_lines(Parser *parser) {
     return parser->head;
 }
 
+Line *filter_lines(Line *lines, LineFilterPredicate predicate) {
+    Line *head = NULL;
+    Line *tail = NULL;
+
+    for (Line *line = lines; line != NULL; line = line->next) {
+        if (predicate(line)) {
+            Line *copy = malloc(sizeof(Line));
+
+            if (copy == NULL) {
+                perror("Buy more RAM");
+                exit(1);
+            }
+
+            copy->indent = line->indent;
+            copy->state = line->state;
+            copy->week_day = line->week_day;
+            copy->date = line->date;
+            copy->start = line->start;
+            copy->end = line->end;
+            copy->text = line->text;
+            copy->text_size = line->text_size;
+            copy->next = NULL;
+
+            if (head == NULL) {
+                tail = head = copy;
+            } else {
+                tail = tail->next = copy;
+            }
+        }
+    }
+
+    return head;
+}
+
+void free_lines(Line *lines) {
+    Line *line = lines;
+
+    while (line != NULL) {
+        Line *next = line->next;
+
+        free(line);
+
+        line = next;
+    }
+}
+
 // ---------------------------------------- Parser End ----------------------------------------
 
 // ---------------------------------------- Compile Start ----------------------------------------
 
-static Line *compile_file(const char *filepath, char **content) {
-    size_t file_size = read_file(filepath, content);
-
-    Lexer lexer = create_lexer(*content, file_size);
+static Line *compile_file(char *content, size_t content_size) {
+    Lexer lexer = create_lexer(content, content_size);
 
     Token *tokens = tokenize(&lexer);
 
@@ -892,7 +938,7 @@ static void display_line(Line *line, char *padding, size_t max_string_size) {
     printf("\n");
 }
 
-static void display_lines(Line *lines, char *padding) {
+static void display_lines_and_free(Line *lines, char *padding) {
     size_t max_string_size = 0;
 
     for (Line *line = lines; line != NULL; line = line->next) {
@@ -902,12 +948,31 @@ static void display_lines(Line *lines, char *padding) {
             max_string_size = size;
     }
 
-    for (Line *line = lines; line != NULL; line = line->next) {
+    Line *line = lines;
+
+    while (line != NULL) {
+        Line *next = line->next;
+
         display_line(line, padding, max_string_size);
+        free(line);
+
+        line = next;
     }
 }
 
-static int display_today_lines(Line *lines, char *padding) {
+static bool filter_today_lines(Line *line) {
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+
+    // Extract day, month, and year
+    int day = tm.tm_mday;    // Day of the month (1-31)
+    int month = tm.tm_mon + 1; // Month (0-11), so add 1
+    int year = tm.tm_year + 1900; // Year since 1900, so add 1900
+                                  //
+    return line->date.day_value == day && line->date.month_value == month && line->date.year_value + 2000 == year;
+}
+
+static int display_today_lines_and_free(Line *lines, char *padding) {
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
 
@@ -927,11 +992,18 @@ static int display_today_lines(Line *lines, char *padding) {
 
     int count = 0;
 
-    for (Line *line = lines; line != NULL; line = line->next) {
+    Line *line = lines;
+
+    while (line != NULL) {
+        Line *next = line->next;
+
         if (line->date.day_value == day && line->date.month_value == month && line->date.year_value + 2000 == year) {
             display_line(line, padding, max_string_size);
+            free(line);
             count++;
         }
+
+        line = next;
     }
 
     return count;
@@ -944,7 +1016,7 @@ static void usage(FILE *stream, const char *program_name, char *error_message, .
 
     fprintf(stream, "%s [option] [arguments]\n", program_name);
     fprintf(stream, "\n");
-    fprintf(stream, "    add     a    [filename]           add a new file to the tracking system\n");
+    fprintf(stream, "    add     a    [filename] [title]   add a new file to the tracking system\n");
     fprintf(stream, "    remove  r    [filename|id]        remove a file from the tracking system\n");
     fprintf(stream, "    get     g    [filename|id]        get specific file by path or id\n");
     fprintf(stream, "    open    o    [filename|id]        open a file using vim by path or id\n");
@@ -994,7 +1066,9 @@ static int add_action(const char *filename) {
 
     char *content;
 
-    compile_file(abs_path, &content);
+    size_t content_size = read_file(abs_path, &content);
+
+    free_lines(compile_file(content, content_size));
 
     add_file_to_database(&database, abs_path);
 
@@ -1109,10 +1183,12 @@ static int view_action() {
 
         char *content;
 
-        Line *lines = compile_file(file->filepath, &content);
+        size_t content_size = read_file(file->filepath, &content);
+
+        Line *lines = compile_file(content, content_size);
 
         printf("\n");
-        display_lines(lines, "        ");
+        display_lines_and_free(lines, "        ");
 
         if (file->next != NULL) {
             printf("\n");
@@ -1139,21 +1215,27 @@ static int today_action() {
     printf("Today tasks:\n\n");
 
     for (DbFile *file = database.head; file != NULL; file = file->next) {
-        printf("    [ID:%ld] %s\n", file->id, file->filepath);
-
         char *content;
 
-        Line *lines = compile_file(file->filepath, &content);
+        size_t content_size = read_file(file->filepath, &content);
 
-        printf("\n");
-        if (display_today_lines(lines, "        ") == 0) {
-            printf("        There is not task for today is this list\n");
-        }
+        Line *lines = compile_file(content, content_size);
 
-        if (file->next != NULL) {
+        Line *lines_filtered = filter_lines(lines, filter_today_lines);
+
+        if (lines_filtered != NULL) {
+            printf("    [ID:%ld] %s\n", file->id, file->filepath);
+
             printf("\n");
+            display_today_lines_and_free(lines_filtered, "        ");
+
+            if (file->next != NULL) {
+                printf("\n");
+            }
         }
+
         
+        free_lines(lines);
         free(content);
     }
 
@@ -1191,10 +1273,13 @@ static int get_action(const char *program_name, const char *file_identifier) {
 
         char *content;
 
-        Line *lines = compile_file(file->filepath, &content);
+        size_t content_size = read_file(file->filepath, &content);
 
-        display_lines(lines, "");
+        Line *lines = compile_file(content, content_size);
 
+        display_lines_and_free(lines, "");
+
+        free(content);
         free_database(&database);
 
         return 0;
@@ -1218,11 +1303,14 @@ static int get_action(const char *program_name, const char *file_identifier) {
 
     char *content;
 
-    Line *lines = compile_file(abs_path, &content);
+    size_t content_size = read_file(abs_path, &content);
 
-    display_lines(lines, "");
+    Line *lines = compile_file(content, content_size);
+
+    display_lines_and_free(lines, "");
 
     free_database(&database);
+    free(content);
     
     return 0;
 }
