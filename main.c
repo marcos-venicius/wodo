@@ -485,7 +485,7 @@ typedef enum {
 } Week_Day;
 
 typedef enum {
-    TS_PAST = 0,
+    TS_PAST,
     TS_PRESENT,
     TS_FUTURE
 } Time_State;
@@ -683,7 +683,7 @@ static int parse_hour(const char *string, size_t size) {
         exit(1);
     }
 
-    int bn = parse_char_to_number(a);
+    int bn = parse_char_to_number(b);
 
     if (an == 2 && bn > 3) {
         fprintf(stderr, "\033[1;31merror\033[0m invalid file format. invalid hour %c%c\n", a, b);
@@ -709,7 +709,7 @@ static int parse_minute(const char *string, size_t size) {
         exit(1);
     }
 
-    int bn = parse_char_to_number(a);
+    int bn = parse_char_to_number(b);
 
     return an * 10 + bn;
 }
@@ -874,12 +874,15 @@ static Line *parse_line(Parser *parser) {
     time_t start_timestamp = get_timestamp(from_date_and_time_to_sysdatetime(line->date, line->start));
     time_t end_timestamp = get_timestamp(from_date_and_time_to_sysdatetime(line->date, line->end));
 
-    if (today_date_timestamp < start_timestamp) {
+    if (today_date_timestamp >= start_timestamp && today_date_timestamp <= end_timestamp) {
+        line->time_state = TS_PRESENT;
+    } else if (today_date_timestamp < start_timestamp) {
         line->time_state = TS_FUTURE;
     } else if (today_date_timestamp > end_timestamp) {
         line->time_state = TS_PAST;
     } else {
-        line->time_state = TS_PRESENT;
+        fprintf(stderr, "could not parse time state\n");
+        exit(1);
     }
 
     return line;
@@ -917,14 +920,8 @@ Line *filter_lines(Line *lines, LineFilterPredicate predicate) {
                 exit(1);
             }
 
-            copy->indent = line->indent;
-            copy->state = line->state;
-            copy->week_day = line->week_day;
-            copy->date = line->date;
-            copy->start = line->start;
-            copy->end = line->end;
-            copy->text = line->text;
-            copy->text_size = line->text_size;
+            memcpy(copy, line, sizeof(Line));
+
             copy->next = NULL;
 
             if (head == NULL) {
@@ -972,16 +969,21 @@ static void display_line(Line *line, char *padding, size_t max_string_size) {
     if (line->state == S_DONE) {
         printf("\033[0;32m");
     } else {
-        if (line->time_state == TS_PAST) {
-            if (line->state == S_TODO) {
-                printf("\033[0;31m");
-            } else if (line->state == S_IN_PROGRESS) {
-                printf("\033[0;33m");
-            }
-        } else if (line->time_state == TS_PRESENT) {
-            if (line->state == S_IN_PROGRESS) {
-                printf("\033[0;36m");
-            }
+        switch (line->time_state) {
+            case TS_PAST: {
+                if (line->state == S_TODO) {
+                    printf("\033[0;31m");
+                } else if (line->state == S_IN_PROGRESS) {
+                    printf("\033[0;33m");
+                }
+            } break;
+            case TS_FUTURE:
+            case TS_PRESENT: {
+                if (line->state == S_IN_PROGRESS) {
+                    printf("\033[0;36m");
+                }
+            } break;
+            default: break;
         }
     }
 
