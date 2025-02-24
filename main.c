@@ -14,6 +14,7 @@
 
 #define DB_FILENAME ".wodo.db"
 #define MAX_FILENAME_SIZE 255
+#define MAX_FILTER_SIZE 10
 #define DB_FILEPATH_MAX_BUFFER (MAX_FILENAME_SIZE + MAX_FILENAME_SIZE + MAX_FILENAME_SIZE) // /<home>/<user>/file
 
 // ---------------------------------------- Utils Start ----------------------------------------
@@ -142,6 +143,7 @@ typedef enum {
     AK_OPEN,
     AK_TODAY,
     AK_LIST,
+    AK_FILTER,
 } ArgumentKind;
 
 typedef struct {
@@ -469,7 +471,7 @@ static Token *tokenize(Lexer *lexer) {
 // ---------------------------------------- Parser Start ----------------------------------------
 
 typedef enum {
-    S_TODO,
+    S_TODO = 0,
     S_IN_PROGRESS,
     S_DONE,
 } State;
@@ -485,7 +487,7 @@ typedef enum {
 } Week_Day;
 
 typedef enum {
-    TS_PAST,
+    TS_PAST = 0,
     TS_PRESENT,
     TS_FUTURE
 } Time_State;
@@ -526,7 +528,7 @@ struct Line {
     Line *next;
 };
 
-typedef bool (*LineFilterPredicate)(Line *line);
+typedef bool (*LineFilterPredicate)(const Line *line, const void *data);
 
 typedef struct {
     Line *head;
@@ -870,7 +872,7 @@ static Line *parse_line(Parser *parser) {
     expect_kind(parser, TK_SPACE);
 
     line->state = parse_state(parser);
-    
+
     time_t start_timestamp = get_timestamp(from_date_and_time_to_sysdatetime(line->date, line->start));
     time_t end_timestamp = get_timestamp(from_date_and_time_to_sysdatetime(line->date, line->end));
 
@@ -907,12 +909,12 @@ static Line *parse_lines(Parser *parser) {
     return parser->head;
 }
 
-Line *filter_lines(Line *lines, LineFilterPredicate predicate) {
+Line *filter_lines(const Line *lines, LineFilterPredicate predicate, void *data) {
     Line *head = NULL;
     Line *tail = NULL;
 
-    for (Line *line = lines; line != NULL; line = line->next) {
-        if (predicate(line)) {
+    for (const Line *line = lines; line != NULL; line = line->next) {
+        if (predicate(line, data)) {
             Line *copy = malloc(sizeof(Line));
 
             if (copy == NULL) {
@@ -1048,10 +1050,24 @@ static void display_lines_and_free(Line *lines, char *padding) {
     }
 }
 
-static bool filter_today_lines(Line *line) {
+static bool filter_today_lines(const Line *line, const void *data) {
+    (void)data;
+
     return (line->date.day_value == today_date.day &&
             line->date.month_value == today_date.month &&
             line->date.year_value + 2000 == today_date.year);
+}
+
+static bool filter_lines_by_state(const Line *line, const void *data) {
+    State state = *(State*)data;
+
+    return line->state == state;
+}
+
+static bool filter_lines_by_time_state(const Line *line, const void *data) {
+    Time_State state = *(Time_State*)data;
+
+    return line->time_state == state;
 }
 
 static int display_today_lines_and_free(Line *lines, char *padding) {
@@ -1098,14 +1114,17 @@ static void usage(FILE *stream, const char *program_name, char *error_message, .
 
     fprintf(stream, "%s [option] [arguments]\n", program_name);
     fprintf(stream, "\n");
-    fprintf(stream, "    add     a    [filename] [title]   add a new file to the tracking system\n");
-    fprintf(stream, "    remove  r    [filename|id]        remove a file from the tracking system\n");
-    fprintf(stream, "    get     g    [filename|id]        get specific file by path or id\n");
-    fprintf(stream, "    open    o    [filename|id]        open a file using vim by path or id\n");
-    fprintf(stream, "    view    v                         view files\n");
-    fprintf(stream, "    list    l                         list files\n");
-    fprintf(stream, "    today   t                         view today tasks\n");
-    fprintf(stream, "    help    h                         display this message\n");
+    fprintf(stream, "    add     a    [filename] [title]            add a new file to the tracking system\n");
+    fprintf(stream, "    remove  r    [filename|id]                 remove a file from the tracking system\n");
+    fprintf(stream, "    get     g    [filename|id]                 get specific file by path or id\n");
+    fprintf(stream, "    open    o    [filename|id]                 open a file using vim by path or id\n");
+    fprintf(stream, "    view    v                                  view files\n");
+    fprintf(stream, "    list    l                                  list files\n");
+    fprintf(stream, "    today   t                                  view today tasks\n");
+    fprintf(stream, "    filter  f                                  filter tasks\n");
+    fprintf(stream, "                 [ts=past|future|present]      search for time state\n");
+    fprintf(stream, "                 [s=todo|doing|done]           search for current task state\n");
+    fprintf(stream, "    help    h                                  display this message\n");
 
     if (error_message != NULL) {
         va_start(args, error_message);
@@ -1275,7 +1294,7 @@ static int view_action() {
         if (file->next != NULL) {
             printf("\n");
         }
-        
+
         free(content);
     }
     printf("\n");
@@ -1303,7 +1322,7 @@ static int today_action() {
 
         Line *lines = compile_file(content, content_size);
 
-        Line *lines_filtered = filter_lines(lines, filter_today_lines);
+        Line *lines_filtered = filter_lines(lines, filter_today_lines, NULL);
 
         if (lines_filtered != NULL) {
             printf("    [ID:%ld] %s\n", file->id, file->filepath);
@@ -1316,7 +1335,7 @@ static int today_action() {
             }
         }
 
-        
+
         free_lines(lines);
         free(content);
     }
@@ -1334,6 +1353,164 @@ static int list_action() {
     for (DbFile *file = database.head; file != NULL; file = file->next)
         printf("[ID:%ld] %s\n", file->id, file->filepath);
 
+    free_database(&database);
+
+    return 0;
+}
+
+static bool is_state_filter(const char *filter, size_t size) {
+    if (size != 1) return false;
+
+    return filter[0] == 's';
+}
+
+static bool is_time_state_filter(const char *filter, size_t size) {
+    if (size != 2) return false;
+
+    return filter[0] == 't' && filter[1] == 's';
+}
+
+typedef struct {
+    bool state;
+    State state_value;
+
+    bool time_state;
+    Time_State time_state_value;
+} Filters;
+
+static int filter_action(const char *program_name, const char *filter) {
+    size_t filter_size = strlen(filter);
+
+    if (filter_size > MAX_FILTER_SIZE) {
+        usage(stderr, program_name, "your filter exceded the max size: %d", MAX_FILTER_SIZE);
+        return 1;
+    }
+
+    int filter_key_size = -1;
+    char filter_key[filter_size];
+    char filter_value[filter_size];
+
+    for (size_t i = 0; i < filter_size; ++i) {
+        if (filter[i] == '=') {
+            filter_key_size = i;
+            break;
+        }
+    }
+
+    if (filter_key_size == -1) {
+        usage(stderr, program_name, "missing filter key");
+        return 1;
+    } else if (filter_size - filter_key_size - 1 /* the equal sign */ <= 0) {
+        usage(stderr, program_name, "missing filter value ex: %.*s=...", filter_key_size, filter);
+        return 1;
+    }
+
+    memcpy(filter_key, filter, filter_key_size);
+
+    bool state_filter = is_state_filter(filter_key, filter_key_size);
+    bool time_state_filter = is_time_state_filter(filter_key, filter_key_size);
+
+    if (!state_filter && !time_state_filter) {
+        usage(stderr, program_name, "invalid filter %.*s. Look at available filters", filter_key_size, filter_key);
+        return 1;
+    }
+
+    int filter_value_size = filter_size - filter_key_size - 1;
+
+    memcpy(filter_value, filter + filter_key_size + 1, filter_value_size);
+
+    Database database = load_database();
+
+    if (database.size == 0) {
+        printf("There is no file yet\n");
+
+        return 0;
+    }
+
+    Filters filters = {0};
+
+    if (state_filter) {
+        filters.state = true;
+
+        const char *todo_option = "todo";
+        const size_t todo_option_size = 4;
+        const char *doing_option = "doing";
+        const size_t doing_option_size = 5;
+        const char *done_option = "done";
+        const size_t done_option_size = 4;
+
+        if (cmp_sized_strings(todo_option, filter_value, todo_option_size, filter_value_size)) {
+            filters.state_value = S_TODO;
+        } else if (cmp_sized_strings(doing_option, filter_value, doing_option_size, filter_value_size)) {
+            filters.state_value = S_IN_PROGRESS;
+        } else if (cmp_sized_strings(done_option, filter_value, done_option_size, filter_value_size)) {
+            filters.state_value = S_DONE;
+        } else {
+            usage(stderr, program_name, "invalid filter value %.*s=%.*s. Look at available filters", filter_key_size, filter_key, filter_value_size, filter_value);
+            return 1;
+        }
+    }
+
+    if (time_state_filter) {
+        filters.time_state = true;
+
+        const char *past_option = "past";
+        const size_t past_option_size = 4;
+        const char *present_option = "present";
+        const size_t present_option_size = 7;
+        const char *future_option = "future";
+        const size_t future_option_size = 6;
+
+        if (cmp_sized_strings(past_option, filter_value, past_option_size, filter_value_size)) {
+            filters.time_state_value = TS_PAST;
+        } else if (cmp_sized_strings(present_option, filter_value, present_option_size, filter_value_size)) {
+            filters.time_state_value = TS_PRESENT;
+        } else if (cmp_sized_strings(future_option, filter_value, future_option_size, filter_value_size)) {
+            filters.time_state_value = TS_FUTURE;
+        } else {
+            usage(stderr, program_name, "invalid filter value %.*s=%.*s. Look at available filters", filter_key_size, filter_key, filter_value_size, filter_value);
+            return 1;
+        }
+    }
+
+    for (DbFile *file = database.head; file != NULL; file = file->next) {
+        char *content;
+
+        size_t content_size = read_file(file->filepath, &content);
+
+        Line *lines = compile_file(content, content_size);
+
+        if (filters.state) {
+            Line *lines_filtered = filter_lines(lines, filter_lines_by_state, &filters.state_value);
+
+            if (lines != NULL) free_lines(lines);
+
+            lines = lines_filtered;
+        }
+
+        if (filters.time_state) {
+            Line *lines_filtered = filter_lines(lines, filter_lines_by_time_state, &filters.time_state_value);
+
+            if (lines != NULL) free_lines(lines);
+
+            lines = lines_filtered;
+        }
+
+        if (lines != NULL) {
+            printf("    [ID:%ld] %s\n", file->id, file->filepath);
+
+            printf("\n");
+            display_lines_and_free(lines, "        ");
+
+            if (file->next != NULL) {
+                printf("\n");
+            }
+        }
+
+        free(content);
+    }
+
+    printf("\n");
     free_database(&database);
 
     return 0;
@@ -1393,7 +1570,7 @@ static int get_action(const char *program_name, const char *file_identifier) {
 
     free_database(&database);
     free(content);
-    
+
     return 0;
 }
 
@@ -1512,6 +1689,17 @@ int main(int argc, char **argv) {
             args.kind = AK_TODAY;
         } else if (arg_cmp(arg, "list", "l")) {
             args.kind = AK_LIST;
+        } else if (arg_cmp(arg, "filter", "f")) {
+            const char *value = shift(&argc, &argv);
+
+            if (value == NULL) {
+                usage(stderr, program_name, "the option \"%s\" expects a filter", arg);
+
+                return 1;
+            }
+
+            args.kind = AK_FILTER;
+            args.value = value;
         } else {
             if (*arg == '-') {
                 usage(stderr, program_name, "flag %s does not exists", arg);
@@ -1531,6 +1719,7 @@ int main(int argc, char **argv) {
         case AK_OPEN: return open_action(program_name, args.value);
         case AK_TODAY: return today_action();
         case AK_LIST: return list_action();
+        case AK_FILTER: return filter_action(program_name, args.value);
         default:
             usage(stderr, program_name, NULL);
             return 1;
