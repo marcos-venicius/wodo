@@ -18,6 +18,47 @@
 
 // ---------------------------------------- Utils Start ----------------------------------------
 
+typedef struct {
+    int day, month, year, hour, minute;
+} SysDateTime;
+
+static SysDateTime today_date;
+static time_t today_date_timestamp;
+
+static SysDateTime get_today_date() {
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+
+    // Extract day, month, and year
+    int day = tm.tm_mday;    // Day of the month (1-31)
+    int month = tm.tm_mon + 1; // Month (0-11), so add 1
+    int year = tm.tm_year + 1900; // Year since 1900, so add 1900
+    int hour = tm.tm_hour;
+    int minute = tm.tm_min;
+
+    return (SysDateTime){.day = day, .month = month, .year = year, .hour = hour, .minute = minute };
+}
+
+static time_t get_timestamp(SysDateTime sys_date_time) {
+    struct tm t = {0};
+
+    t.tm_year = sys_date_time.year - 1900;
+    t.tm_mon = sys_date_time.month - 1;
+    t.tm_mday = sys_date_time.day;
+    t.tm_hour = sys_date_time.hour;
+    t.tm_min = sys_date_time.minute;
+    t.tm_sec = 0;
+
+    time_t timestamp = mktime(&t);
+
+    if (timestamp == -1) {
+        fprintf(stderr, "could not convert to timestamp\n");
+        exit(1);
+    }
+
+    return timestamp;
+}
+
 static size_t read_file(const char *filename, char **content) {
     FILE *fptr = fopen(filename, "r");
 
@@ -443,6 +484,12 @@ typedef enum {
     WD_SATURDAY,
 } Week_Day;
 
+typedef enum {
+    TS_PAST = 0,
+    TS_PRESENT,
+    TS_FUTURE
+} Time_State;
+
 typedef struct {
     char hour[2];
     int hour_value;
@@ -470,6 +517,8 @@ struct Line {
     Date date;
     Time start;
     Time end;
+
+    Time_State time_state;
 
     const char *text;
     size_t text_size;
@@ -509,6 +558,16 @@ static const char *in_progress = "Doing";
 static const size_t in_progress_size = 5;
 static const char *done = "Done";
 static const size_t done_size = 4;
+
+static SysDateTime from_date_and_time_to_sysdatetime(Date date, Time time) {
+    return (SysDateTime){
+        .year= date.year_value + 2000,
+        .month = date.month_value,
+        .day = date.day_value,
+        .hour = time.hour_value,
+        .minute = time.minute_value
+    };
+}
 
 static bool cmp_sized_strings(const char *a, const char *b, size_t len_a, size_t len_b) {
     if (len_a != len_b) return false;
@@ -811,6 +870,17 @@ static Line *parse_line(Parser *parser) {
     expect_kind(parser, TK_SPACE);
 
     line->state = parse_state(parser);
+    
+    time_t start_timestamp = get_timestamp(from_date_and_time_to_sysdatetime(line->date, line->start));
+    time_t end_timestamp = get_timestamp(from_date_and_time_to_sysdatetime(line->date, line->end));
+
+    if (today_date_timestamp < start_timestamp) {
+        line->time_state = TS_FUTURE;
+    } else if (today_date_timestamp > end_timestamp) {
+        line->time_state = TS_PAST;
+    } else {
+        line->time_state = TS_PRESENT;
+    }
 
     return line;
 }
@@ -899,6 +969,22 @@ static Line *compile_file(char *content, size_t content_size) {
 // ---------------------------------------- Data View Start ----------------------------------------
 
 static void display_line(Line *line, char *padding, size_t max_string_size) {
+    if (line->state == S_DONE) {
+        printf("\033[0;32m");
+    } else {
+        if (line->time_state == TS_PAST) {
+            if (line->state == S_TODO) {
+                printf("\033[0;31m");
+            } else if (line->state == S_IN_PROGRESS) {
+                printf("\033[0;33m");
+            }
+        } else if (line->time_state == TS_PRESENT) {
+            if (line->state == S_IN_PROGRESS) {
+                printf("\033[0;36m");
+            }
+        }
+    }
+
     printf("%s%*.s", padding, line->indent, "");
     printf("%.*s    %*.s", (int)line->text_size, line->text, (int)(max_string_size - line->text_size - line->indent), "");
 
@@ -935,7 +1021,7 @@ static void display_line(Line *line, char *padding, size_t max_string_size) {
         case S_DONE: printf("Done"); break;
     }
 
-    printf("\n");
+    printf("\033[0m\n");
 }
 
 static void display_lines_and_free(Line *lines, char *padding) {
@@ -961,15 +1047,9 @@ static void display_lines_and_free(Line *lines, char *padding) {
 }
 
 static bool filter_today_lines(Line *line) {
-    time_t t = time(NULL);
-    struct tm tm = *localtime(&t);
-
-    // Extract day, month, and year
-    int day = tm.tm_mday;    // Day of the month (1-31)
-    int month = tm.tm_mon + 1; // Month (0-11), so add 1
-    int year = tm.tm_year + 1900; // Year since 1900, so add 1900
-                                  //
-    return line->date.day_value == day && line->date.month_value == month && line->date.year_value + 2000 == year;
+    return (line->date.day_value == today_date.day &&
+            line->date.month_value == today_date.month &&
+            line->date.year_value + 2000 == today_date.year);
 }
 
 static int display_today_lines_and_free(Line *lines, char *padding) {
@@ -1366,6 +1446,9 @@ static int open_action(const char *program_name, const char *file_identifier) {
 }
 
 int main(int argc, char **argv) {
+    today_date = get_today_date();
+    today_date_timestamp = get_timestamp(today_date);
+
     Arguments args = {0};
 
     const char *program_name = shift(&argc, &argv);
