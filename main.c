@@ -1629,6 +1629,8 @@ static int get_action(const char *program_name, const char *file_identifier) {
 
         if (file == NULL) {
             fprintf(stderr, "\033[1;31merror:\033[0m there is no file with id %s in the database\n", file_identifier);
+
+            free_database(&database);
             return 1;
         }
     } else {
@@ -1674,41 +1676,43 @@ static void open_vim_at(const char *filepath) {
 }
 
 static int open_action(const char *program_name, const char *file_identifier) {
-    if (is_number(file_identifier)) {
-        size_t id = strtoul(file_identifier, NULL, 10);
-
-        Database database = load_database();
-
-        const DbFile *file = get_database_file_by_id(&database, id);
-
-        if (file == NULL) {
-            fprintf(stderr, "\033[1;31merror:\033[0m there is no file with id %s in the database\n", file_identifier);
-            return 1;
-        }
-
-        open_vim_at(file->filepath);
-
-        free_database(&database);
-        return 0;
-    }
-
-    char *abs_path = realpath(file_identifier, NULL);
-
-    if (abs_path == NULL) {
-        fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
-
-        return 1;
-    }
+    DbFile *file = NULL;
 
     Database database = load_database();
 
-    if (!filepath_exists_on_database(&database, abs_path)) {
-        fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", file_identifier);
-        fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, file_identifier);
-        return 1;
+    if (file_identifier == NULL) {
+        file = database.selected_file;
+    } else if (is_number(file_identifier)) {
+        size_t id = strtoul(file_identifier, NULL, 10);
+
+        file = get_database_file_by_id(&database, id);
+
+        if (file == NULL) {
+            fprintf(stderr, "\033[1;31merror:\033[0m there is no file with id %s in the database\n", file_identifier);
+
+            free_database(&database);
+            return 1;
+        }
+    } else {
+        char *abs_path = realpath(file_identifier, NULL);
+
+        if (abs_path == NULL) {
+            fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
+
+            free_database(&database);
+            return 1;
+        }
+
+        if ((file = get_database_file_by_filepath(&database, abs_path)) == NULL) {
+            fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", file_identifier);
+            fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, file_identifier);
+
+            free_database(&database);
+            return 1;
+        }
     }
 
-    open_vim_at(abs_path);
+    open_vim_at(file->filepath);
 
     return 0;
 }
