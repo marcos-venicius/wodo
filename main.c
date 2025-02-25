@@ -1286,17 +1286,13 @@ static int view_action(void) {
     Database database = load_database();
 
     if (database.files_count == 0) {
-        printf("There is no file yet\n");
-
         return 0;
     }
 
     show_current_selected_file(&database);
 
-    printf("Files:\n\n");
-
     for (DbFile *file = database.files_head; file != NULL; file = file->next) {
-        printf("    [ID:%ld] %s\n", file->id, file->filepath);
+        printf("[ID:%ld] %s\n", file->id, file->filepath);
 
         char *content;
 
@@ -1305,7 +1301,7 @@ static int view_action(void) {
         Line *lines = compile_file(content, content_size);
 
         printf("\n");
-        display_lines_and_free(lines, "        ");
+        display_lines_and_free(lines, "    ");
 
         if (file->next != NULL) {
             printf("\n");
@@ -1324,15 +1320,7 @@ static int today_action(void) {
 
     Database database = load_database();
 
-    if (database.files_count == 0) {
-        printf("There is no file yet\n");
-
-        return 0;
-    }
-
     show_current_selected_file(&database);
-
-    printf("Today tasks:\n\n");
 
     for (DbFile *file = database.files_head; file != NULL; file = file->next) {
         char *content;
@@ -1344,10 +1332,10 @@ static int today_action(void) {
         Line *lines_filtered = filter_lines(lines, filter_today_lines, NULL);
 
         if (lines_filtered != NULL) {
-            printf("    [ID:%ld] %s\n", file->id, file->filepath);
+            printf("[ID:%ld] %s\n", file->id, file->filepath);
 
             printf("\n");
-            display_today_lines_and_free(lines_filtered, "        ");
+            display_today_lines_and_free(lines_filtered, "    ");
 
             if (file->next != NULL) {
                 printf("\n");
@@ -1520,10 +1508,10 @@ static int filter_action(const char *program_name, const char *filter) {
         }
 
         if (lines != NULL) {
-            printf("    [ID:%ld] %s\n", file->id, file->filepath);
+            printf("[ID:%ld] %s\n", file->id, file->filepath);
 
             printf("\n");
-            display_lines_and_free(lines, "        ");
+            display_lines_and_free(lines, "    ");
 
             if (file->next != NULL) {
                 printf("\n");
