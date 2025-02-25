@@ -416,7 +416,7 @@ static void save_token(Lexer *lexer, Token_Kind kind) {
     Token *token = malloc(sizeof(Token));
 
     token->value = lexer->content + lexer->bot;
-    token->value_size = lexer->cursor - lexer->bot;
+    token->value_size = lexer->cursor - lexer->bot; // TODO: FIXME: search how to handle utf-8 strings to allow portuguese accent marks
     token->kind = kind;
     token->next = NULL;
 
@@ -1018,8 +1018,9 @@ static void display_line(Line *line, char *padding, size_t max_string_size) {
         }
     }
 
+    int space = max_string_size - line->text_size - line->indent;
     printf("%s%*.s", padding, line->indent, "");
-    printf("%.*s    %*.s", (int)line->text_size, line->text, (int)(max_string_size - line->text_size - line->indent), "");
+    printf("%.*s    %*.s", (int)line->text_size, line->text, space, "");
 
     switch (line->week_day) {
         case WD_SUNDAY:    printf("Sunday   "); break;
