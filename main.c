@@ -1616,55 +1616,42 @@ static int select_action(const char *program_name, const char *file_identifier) 
 
 // `file_identifier` can be an Id or the path to the file
 static int get_action(const char *program_name, const char *file_identifier) {
-    if (is_number(file_identifier)) {
+    Database database = load_database();
+
+    DbFile *file = NULL;
+
+    if (file_identifier == NULL) {
+        file = database.selected_file;
+    } else if (is_number(file_identifier)) {
         size_t id = strtoul(file_identifier, NULL, 10);
 
-        Database database = load_database();
-
-        show_current_selected_file(&database);
-
-        const DbFile *file = get_database_file_by_id(&database, id);
+        file = get_database_file_by_id(&database, id);
 
         if (file == NULL) {
             fprintf(stderr, "\033[1;31merror:\033[0m there is no file with id %s in the database\n", file_identifier);
             return 1;
         }
+    } else {
+        char *abs_path = realpath(file_identifier, NULL);
 
-        char *content;
+        if (abs_path == NULL) {
+            fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
 
-        size_t content_size = read_file(file->filepath, &content);
+            return 1;
+        }   
 
-        Line *lines = compile_file(content, content_size);
+        if ((file = get_database_file_by_filepath(&database, abs_path)) == NULL) {
+            fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", file_identifier);
+            fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, file_identifier);
 
-        display_lines_and_free(lines, "");
-
-        free(content);
-        free_database(&database);
-
-        return 0;
+            free_database(&database);
+            return 1;
+        }
     }
-
-    char *abs_path = realpath(file_identifier, NULL);
-
-    if (abs_path == NULL) {
-        fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
-
-        return 1;
-    }
-
-    Database database = load_database();
-
-    show_current_selected_file(&database);
-
-    if (!filepath_exists_on_database(&database, abs_path)) {
-        fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", file_identifier);
-        fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, file_identifier);
-        return 1;
-    }
-
+ 
     char *content;
 
-    size_t content_size = read_file(abs_path, &content);
+    size_t content_size = read_file(file->filepath, &content);
 
     Line *lines = compile_file(content, content_size);
 
@@ -1736,6 +1723,11 @@ int main(int argc, char **argv) {
 
     char *arg;
 
+    // TODO: do not load database twice
+    Database database = load_database();
+
+    bool does_have_selected_file = database.current_selected_file_id != 0;
+
     while ((arg = shift(&argc, &argv)) != NULL) {
         if (arg_cmp(arg, "help", "h")) {
             usage(stdout, program_name, NULL);
@@ -1755,8 +1747,8 @@ int main(int argc, char **argv) {
         } else if (arg_cmp(arg, "remove", "r")) {
             const char *value = shift(&argc, &argv);
 
-            if (value == NULL) {
-                usage(stderr, program_name, "option \"%s\" expects a filename or id", arg);
+            if (value == NULL && !does_have_selected_file) {
+                usage(stderr, program_name, "option \"%s\" expects a filename or id. you don't have any selected files", arg);
 
                 return 1;
             }
@@ -1768,8 +1760,8 @@ int main(int argc, char **argv) {
         } else if (arg_cmp(arg, "get", "g")) {
             const char *value = shift(&argc, &argv);
 
-            if (value == NULL) {
-                usage(stderr, program_name, "the option \"%s\" expects a filename or id", arg);
+            if (value == NULL && !does_have_selected_file) {
+                usage(stderr, program_name, "the option \"%s\" expects a filename or id. you don't have any selected files", arg);
 
                 return 1;
             }
@@ -1779,8 +1771,8 @@ int main(int argc, char **argv) {
         } else if (arg_cmp(arg, "open", "o")) {
             const char *value = shift(&argc, &argv);
 
-            if (value == NULL) {
-                usage(stderr, program_name, "the option \"%s\" expects a filename or id", arg);
+            if (value == NULL && !does_have_selected_file) {
+                usage(stderr, program_name, "the option \"%s\" expects a filename or id. you don't have any selected file", arg);
 
                 return 1;
             }
@@ -1823,6 +1815,8 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
+
+    free_database(&database);
 
     switch (args.kind) {
         case AK_ADD: return add_action(args.value);
