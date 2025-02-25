@@ -1,4 +1,4 @@
-CXX = gcc
+CXX = clang
 CXX_FLAGS = -Wall -Wextra -pedantic -ggdb
 
 ifeq ($(BUILD), 1)

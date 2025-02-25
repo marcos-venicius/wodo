@@ -26,7 +26,7 @@ typedef struct {
 static SysDateTime today_date;
 static time_t today_date_timestamp;
 
-static SysDateTime get_today_date() {
+static SysDateTime get_today_date(void) {
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
 
@@ -100,7 +100,7 @@ static bool file_exists(const char *filepath) {
     return access(filepath, F_OK) == 0;
 }
 
-static const char *get_user_home_folder() {
+static const char *get_user_home_folder(void) {
     const char *home = getenv("HOME");
 
     if (home == NULL) return getpwuid(getuid())->pw_dir;
@@ -144,6 +144,7 @@ typedef enum {
     AK_TODAY,
     AK_LIST,
     AK_FILTER,
+    AK_SELECT
 } ArgumentKind;
 
 typedef struct {
@@ -161,10 +162,17 @@ struct DbFile {
 };
 
 typedef struct {
-    size_t last_id;
-    size_t size;
-    DbFile *head;
-    DbFile *tail;
+    // it's by default 0, meaning empty or unselected
+    size_t current_selected_file_id;
+
+    // files
+    size_t last_file_id;
+    size_t files_count;
+    DbFile *files_head;
+    DbFile *files_tail;
+
+    // only view fields (these are not saved to the disk)
+    DbFile *selected_file;
 } Database;
 
 typedef enum {
@@ -198,7 +206,7 @@ typedef struct {
 
 // ---------------------------------------- Database Start ----------------------------------------
 
-static const char *get_database_filepath() {
+static const char *get_database_filepath(void) {
     const char *user_home_folder = get_user_home_folder();
 
     static char database_filepath[DB_FILEPATH_MAX_BUFFER];
@@ -208,6 +216,7 @@ static const char *get_database_filepath() {
     return database_filepath;
 }
 
+// this also loads the selected file if it's the one
 static void load_filepath_on_database(Database *database, char *filepath, size_t id) {
     DbFile *file = malloc(sizeof(DbFile));
 
@@ -226,15 +235,19 @@ static void load_filepath_on_database(Database *database, char *filepath, size_t
 
     file->next = NULL;
 
-    if (database->head == NULL) {
-        database->head = file;
-        database->tail = file;
+    if (database->files_head == NULL) {
+        database->files_head = file;
+        database->files_tail = file;
     } else {
-        database->tail = database->tail->next = file;
+        database->files_tail = database->files_tail->next = file;
+    }
+
+    if (database->current_selected_file_id == id) {
+        database->selected_file = file;
     }
 }
 
-static Database load_database() {
+static Database load_database(void) {
     const char *database_filepath = get_database_filepath();
 
     Database database = {0};
@@ -247,10 +260,11 @@ static Database load_database() {
             exit(1);
         }
 
-        fread(&database.size, sizeof(size_t), 1, file);
-        fread(&database.last_id, sizeof(size_t), 1, file);
+        fread(&database.current_selected_file_id, sizeof(size_t), 1, file);
+        fread(&database.files_count, sizeof(size_t), 1, file);
+        fread(&database.last_file_id, sizeof(size_t), 1, file);
 
-        for (size_t i = 0; i < database.size; ++i) {
+        for (size_t i = 0; i < database.files_count; ++i) {
             size_t filepath_size;
             size_t id;
 
@@ -285,10 +299,12 @@ static void save_database(Database *database) {
         exit(1);
     }
 
-    fwrite(&database->size, sizeof(size_t), 1, file);
-    fwrite(&database->last_id, sizeof(size_t), 1, file);
+    fwrite(&database->current_selected_file_id, sizeof(size_t), 1, file);
 
-    for (DbFile *db_file = database->head; db_file != NULL; db_file = db_file->next) {
+    fwrite(&database->files_count, sizeof(size_t), 1, file);
+    fwrite(&database->last_file_id, sizeof(size_t), 1, file);
+
+    for (DbFile *db_file = database->files_head; db_file != NULL; db_file = db_file->next) {
         size_t filepath_size = strlen(db_file->filepath) + 1;
 
         fwrite(&db_file->id, sizeof(size_t), 1, file);
@@ -300,11 +316,11 @@ static void save_database(Database *database) {
 }
 
 static size_t gen_id(Database *database) {
-    return ++database->last_id;
+    return ++database->last_file_id;
 }
 
 static void free_database(Database *database) {
-    DbFile *file = database->head;
+    DbFile *file = database->files_head;
 
     while (file != NULL) {
         DbFile *next = file->next;
@@ -317,17 +333,30 @@ static void free_database(Database *database) {
 }
 
 static bool filepath_exists_on_database(Database *database, const char *filepath) {
-    for (DbFile *file = database->head; file != NULL; file = file->next)
+    for (DbFile *file = database->files_head; file != NULL; file = file->next)
         if (compare_paths(filepath, file->filepath)) return true;
 
     return false;
 }
 
 static DbFile *get_database_file_by_id(const Database *database, size_t id) {
-    for (DbFile *file = database->head; file != NULL; file = file->next)
+    for (DbFile *file = database->files_head; file != NULL; file = file->next)
         if (file->id == id) return file;
 
     return NULL;
+}
+
+// The path should be an absolute path
+static DbFile *get_database_file_by_filepath(const Database *database, const char *filepath) {
+    DbFile *curr = database->files_head;
+
+    while (curr != NULL) {
+        if (compare_paths(curr->filepath, filepath)) break;
+
+        curr = curr->next;
+    }
+
+    return curr;
 }
 
 static void add_file_to_database(Database *database, const char *filepath) {
@@ -348,14 +377,14 @@ static void add_file_to_database(Database *database, const char *filepath) {
     file->id = gen_id(database);
     file->next = NULL;
 
-    if (database->head == NULL) {
-        database->head = file;
-        database->tail = file;
+    if (database->files_head == NULL) {
+        database->files_head = file;
+        database->files_tail = file;
     } else {
-        database->tail = database->tail->next = file;
+        database->files_tail = database->files_tail->next = file;
     }
 
-    database->size++;
+    database->files_count++;
 }
 
 // ---------------------------------------- Database End ----------------------------------------
@@ -1114,17 +1143,18 @@ static void usage(FILE *stream, const char *program_name, char *error_message, .
 
     fprintf(stream, "%s [option] [arguments]\n", program_name);
     fprintf(stream, "\n");
-    fprintf(stream, "    add     a    [filename] [title]            add a new file to the tracking system\n");
-    fprintf(stream, "    remove  r    [filename|id]                 remove a file from the tracking system\n");
-    fprintf(stream, "    get     g    [filename|id]                 get specific file by path or id\n");
-    fprintf(stream, "    open    o    [filename|id]                 open a file using vim by path or id\n");
-    fprintf(stream, "    view    v                                  view files\n");
-    fprintf(stream, "    list    l                                  list files\n");
-    fprintf(stream, "    today   t                                  view today tasks\n");
-    fprintf(stream, "    filter  f                                  filter tasks\n");
-    fprintf(stream, "                 [ts=past|future|present]      search for time state\n");
-    fprintf(stream, "                 [s=todo|doing|done]           search for current task state\n");
-    fprintf(stream, "    help    h                                  display this message\n");
+    fprintf(stream, "    add     a    [filename] [title]                       add a new file to the tracking system\n");
+    fprintf(stream, "    remove  r    [filename|id] or nothing if selected     remove a file from the tracking system\n");
+    fprintf(stream, "    get     g    [filename|id] or nothing if selected     get specific file by path or id\n");
+    fprintf(stream, "    open    o    [filename|id] or nothing if selected     open a file using vim by path or id\n");
+    fprintf(stream, "    select  s    [filename|id]                            set file as selected so you can use it easier\n");
+    fprintf(stream, "    view    v                                             view files\n");
+    fprintf(stream, "    list    l                                             list files\n");
+    fprintf(stream, "    today   t                                             view today tasks\n");
+    fprintf(stream, "    filter  f                                             filter tasks\n");
+    fprintf(stream, "                 [ts=past|future|present]                 search for time state\n");
+    fprintf(stream, "                 [s=todo|doing|done]                      search for current task state\n");
+    fprintf(stream, "    help    h                                             display this message\n");
 
     if (error_message != NULL) {
         va_start(args, error_message);
@@ -1147,6 +1177,12 @@ static char *shift(int *argc, char ***argv) {
 
 static inline bool arg_cmp(const char *actual, const char *expected, const char *alternative) {
     return strncmp(actual, expected, strlen(actual)) == 0 || strncmp(actual, alternative, strlen(actual)) == 0;
+}
+
+static void show_current_selected_file(const Database *database) {
+    if (database->selected_file == NULL) return;
+
+    fprintf(stdout, "current selected file: [ID:%ld] %s\n\n", database->selected_file->id, database->selected_file->filepath);
 }
 
 static int add_action(const char *filename) {
@@ -1191,24 +1227,28 @@ static int remove_action(const char *file_identifier) {
 
         // TODO: abstract this to a function
         DbFile *slow = NULL;
-        DbFile *fast = database.head;
+        DbFile *fast = database.files_head;
 
         while (fast != NULL) {
             if (fast->id == id) {
+                if (id == database.current_selected_file_id) {
+                    database.current_selected_file_id = 0;
+                }
+
                 if (slow == NULL) {
-                    database.head = fast->next;
+                    database.files_head = fast->next;
                 } else {
                     slow->next = fast->next;
                 }
 
-                if (database.tail == fast) {
-                    database.tail = slow;
+                if (database.files_tail == fast) {
+                    database.files_tail = slow;
                 }
 
                 free(fast->filepath);
                 free(fast);
 
-                database.size--;
+                database.files_count--;
 
                 break;
             }
@@ -1235,24 +1275,28 @@ static int remove_action(const char *file_identifier) {
 
     // TODO: abstract this to a function
     DbFile *slow = NULL;
-    DbFile *fast = database.head;
+    DbFile *fast = database.files_head;
 
     while (fast != NULL) {
         if (compare_paths(fast->filepath, abs_path)) {
+            if (fast->id == database.current_selected_file_id) {
+                database.current_selected_file_id = 0;
+            }
+
             if (slow == NULL) {
-                database.head = fast->next;
+                database.files_head = fast->next;
             } else {
                 slow->next = fast->next;
             }
 
-            if (database.tail == fast) {
-                database.tail = slow;
+            if (database.files_tail == fast) {
+                database.files_tail = slow;
             }
 
             free(fast->filepath);
             free(fast);
 
-            database.size--;
+            database.files_count--;
 
             break;
         }
@@ -1268,18 +1312,20 @@ static int remove_action(const char *file_identifier) {
     return 0;
 }
 
-static int view_action() {
+static int view_action(void) {
     Database database = load_database();
 
-    if (database.size == 0) {
+    if (database.files_count == 0) {
         printf("There is no file yet\n");
 
         return 0;
     }
 
+    show_current_selected_file(&database);
+
     printf("Files:\n\n");
 
-    for (DbFile *file = database.head; file != NULL; file = file->next) {
+    for (DbFile *file = database.files_head; file != NULL; file = file->next) {
         printf("    [ID:%ld] %s\n", file->id, file->filepath);
 
         char *content;
@@ -1304,18 +1350,21 @@ static int view_action() {
     return 0;
 }
 
-static int today_action() {
+static int today_action(void) {
+
     Database database = load_database();
 
-    if (database.size == 0) {
+    if (database.files_count == 0) {
         printf("There is no file yet\n");
 
         return 0;
     }
 
+    show_current_selected_file(&database);
+
     printf("Today tasks:\n\n");
 
-    for (DbFile *file = database.head; file != NULL; file = file->next) {
+    for (DbFile *file = database.files_head; file != NULL; file = file->next) {
         char *content;
 
         size_t content_size = read_file(file->filepath, &content);
@@ -1347,10 +1396,12 @@ static int today_action() {
     return 0;
 }
 
-static int list_action() {
+static int list_action(void) {
     Database database = load_database();
 
-    for (DbFile *file = database.head; file != NULL; file = file->next)
+    show_current_selected_file(&database);
+
+    for (DbFile *file = database.files_head; file != NULL; file = file->next)
         printf("[ID:%ld] %s\n", file->id, file->filepath);
 
     free_database(&database);
@@ -1421,11 +1472,13 @@ static int filter_action(const char *program_name, const char *filter) {
 
     Database database = load_database();
 
-    if (database.size == 0) {
+    if (database.files_count == 0) {
         printf("There is no file yet\n");
 
         return 0;
     }
+
+    show_current_selected_file(&database);
 
     Filters filters = {0};
 
@@ -1473,7 +1526,7 @@ static int filter_action(const char *program_name, const char *filter) {
         }
     }
 
-    for (DbFile *file = database.head; file != NULL; file = file->next) {
+    for (DbFile *file = database.files_head; file != NULL; file = file->next) {
         char *content;
 
         size_t content_size = read_file(file->filepath, &content);
@@ -1516,12 +1569,59 @@ static int filter_action(const char *program_name, const char *filter) {
     return 0;
 }
 
+static int select_action(const char *program_name, const char *file_identifier) {
+    Database database = load_database();
+    DbFile *file;
+
+    if (is_number(file_identifier)) {
+        size_t id = strtoul(file_identifier, NULL, 10);
+
+        file = get_database_file_by_id(&database, id);
+
+        if (file == NULL) {
+            fprintf(stderr, "\033[1;31merror:\033[0m there is no file with id %s in the database\n", file_identifier);
+
+            free_database(&database);
+            return 1;
+        }
+    } else {
+        char *abs_path = realpath(file_identifier, NULL);
+
+        if (abs_path == NULL) {
+            fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
+
+            return 1;
+        }
+
+        file = get_database_file_by_filepath(&database, abs_path);
+
+        if (file == NULL) {
+            fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", file_identifier);
+            fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, file_identifier);
+
+            return 1;
+        }
+    }
+
+    database.current_selected_file_id = file->id;
+
+    save_database(&database);
+
+    fprintf(stdout, "selected file changed successfully to \"%s\"\n", file->filepath);
+
+    free_database(&database);
+
+    return 0;
+}
+
 // `file_identifier` can be an Id or the path to the file
 static int get_action(const char *program_name, const char *file_identifier) {
     if (is_number(file_identifier)) {
         size_t id = strtoul(file_identifier, NULL, 10);
 
         Database database = load_database();
+
+        show_current_selected_file(&database);
 
         const DbFile *file = get_database_file_by_id(&database, id);
 
@@ -1553,6 +1653,8 @@ static int get_action(const char *program_name, const char *file_identifier) {
     }
 
     Database database = load_database();
+
+    show_current_selected_file(&database);
 
     if (!filepath_exists_on_database(&database, abs_path)) {
         fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", file_identifier);
@@ -1654,7 +1756,7 @@ int main(int argc, char **argv) {
             const char *value = shift(&argc, &argv);
 
             if (value == NULL) {
-                usage(stderr, program_name, "option \"%s\" expects a filename", arg);
+                usage(stderr, program_name, "option \"%s\" expects a filename or id", arg);
 
                 return 1;
             }
@@ -1667,7 +1769,7 @@ int main(int argc, char **argv) {
             const char *value = shift(&argc, &argv);
 
             if (value == NULL) {
-                usage(stderr, program_name, "the option \"%s\" expects a filename", arg);
+                usage(stderr, program_name, "the option \"%s\" expects a filename or id", arg);
 
                 return 1;
             }
@@ -1678,7 +1780,7 @@ int main(int argc, char **argv) {
             const char *value = shift(&argc, &argv);
 
             if (value == NULL) {
-                usage(stderr, program_name, "the option \"%s\" expects a filename", arg);
+                usage(stderr, program_name, "the option \"%s\" expects a filename or id", arg);
 
                 return 1;
             }
@@ -1700,6 +1802,17 @@ int main(int argc, char **argv) {
 
             args.kind = AK_FILTER;
             args.value = value;
+        } else if (arg_cmp(arg, "select", "s")) {
+            const char *value = shift(&argc, &argv);
+
+            if (value == NULL) {
+                usage(stderr, program_name, "the option \"%s\" expects a filename or id", arg);
+
+                return 1;
+            }
+
+            args.kind = AK_SELECT;
+            args.value = value;
         } else {
             if (*arg == '-') {
                 usage(stderr, program_name, "flag %s does not exists", arg);
@@ -1720,6 +1833,7 @@ int main(int argc, char **argv) {
         case AK_TODAY: return today_action();
         case AK_LIST: return list_action();
         case AK_FILTER: return filter_action(program_name, args.value);
+        case AK_SELECT: return select_action(program_name, args.value);
         default:
             usage(stderr, program_name, NULL);
             return 1;
