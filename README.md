@@ -45,8 +45,6 @@ After do this, everytime you update this file the wodo will be able to see this 
 
 Maybe I'll update this project to allow you to:
 
-- automatically open a todo file on your vim
-- display aligned tasks
 - allow modify tasks via cli
     - change state of a task
     - remove a task
