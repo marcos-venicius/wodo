@@ -1220,57 +1220,28 @@ static int add_action(const char *filename) {
 
 // `file_identifier` can be an Id or the path to the file
 static int remove_action(const char *file_identifier) {
-    if (is_number(file_identifier)) {
-        size_t id = strtoul(file_identifier, NULL, 10);
-
-        Database database = load_database();
-
-        // TODO: abstract this to a function
-        DbFile *slow = NULL;
-        DbFile *fast = database.files_head;
-
-        while (fast != NULL) {
-            if (fast->id == id) {
-                if (id == database.current_selected_file_id) {
-                    database.current_selected_file_id = 0;
-                }
-
-                if (slow == NULL) {
-                    database.files_head = fast->next;
-                } else {
-                    slow->next = fast->next;
-                }
-
-                if (database.files_tail == fast) {
-                    database.files_tail = slow;
-                }
-
-                free(fast->filepath);
-                free(fast);
-
-                database.files_count--;
-
-                break;
-            }
-
-            slow = fast;
-            fast = fast->next;
-        }
-
-        save_database(&database);
-        free_database(&database);
-
-        return 0;
-    }
-
     Database database = load_database();
 
-    char *abs_path = realpath(file_identifier, NULL);
+    size_t id = 0;
 
-    if (abs_path == NULL) {
-        fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
+    if (file_identifier == NULL) {
+        id = database.current_selected_file_id;
+    } else if (is_number(file_identifier)) {
+        id = strtoul(file_identifier, NULL, 10);
+    } else {
+        char *abs_path = realpath(file_identifier, NULL);
 
-        return 1;
+        if (abs_path == NULL) {
+            fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
+
+            return 1;
+        }
+
+        DbFile *file = get_database_file_by_filepath(&database, abs_path);
+
+        if (file == NULL) return 0;
+
+        id = file->id;
     }
 
     // TODO: abstract this to a function
@@ -1278,8 +1249,8 @@ static int remove_action(const char *file_identifier) {
     DbFile *fast = database.files_head;
 
     while (fast != NULL) {
-        if (compare_paths(fast->filepath, abs_path)) {
-            if (fast->id == database.current_selected_file_id) {
+        if (fast->id == id) {
+            if (id == database.current_selected_file_id) {
                 database.current_selected_file_id = 0;
             }
 
@@ -1307,7 +1278,6 @@ static int remove_action(const char *file_identifier) {
 
     save_database(&database);
     free_database(&database);
-    free(abs_path);
 
     return 0;
 }
