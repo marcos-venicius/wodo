@@ -1,3 +1,4 @@
+#include "./conf.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -8,11 +9,11 @@
 #include <pwd.h>
 #include <assert.h>
 #include <wchar.h>
-#include <locale.h>
 #include <sys/wait.h>
 #include <time.h>
 
 #define DB_FILENAME ".wodo.db"
+#define CONFIG_FILENAME ".wodo.conf.db"
 #define MAX_FILENAME_SIZE 255
 #define MAX_FILTER_SIZE 10
 #define DB_FILEPATH_MAX_BUFFER (MAX_FILENAME_SIZE + MAX_FILENAME_SIZE + MAX_FILENAME_SIZE) // /<home>/<user>/file
@@ -1677,6 +1678,27 @@ static int open_action(const char *program_name, const char *file_identifier) {
 }
 
 int main(int argc, char **argv) {
+    wodo_setup_config_file_location("./settings");
+/*
+    for (int i = 0; i < 100; ++i) {
+        char *key = malloc(5 + sizeof(int) + 1);
+
+        sprintf(key, "hello%d", i);
+
+        uint8_t result = wodo_set_config(wodo_config_key_from_cstr(key), wodo_config_value_from_cstr("lorem ipsum dolor sit ammet consectur"));
+
+        switch (result) {
+            case WODO_OK_CODE: printf("success\n"); break;
+            case WODO_MISSING_CONFIG_FILE_LOCATION_ERROR_CODE: printf("missing config file location\n"); break;
+            case WODO_FAIL_OPENING_CONFIG_FILE_ERROR_CODE: printf("fail to open config file\n"); break;
+            case WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE: printf("corrupted file\n"); break;
+            case WODO_FAIL_UPDATING_KEY_ERROR_CODE: printf("failed updating key due to: %s\n", strerror(errno)); break;
+            default: printf("what? %d\n", result);
+        }
+    }
+*/
+    return 0;
+
     today_date = get_today_date();
     today_date_timestamp = get_timestamp(today_date);
 
