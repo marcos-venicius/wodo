@@ -9,6 +9,8 @@
 #define WODO_FAIL_OPENING_CONFIG_FILE_ERROR_CODE 2
 #define WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE 3
 #define WODO_FAIL_UPDATING_KEY_ERROR_CODE 4
+#define WODO_INVALID_ROW_VERSION_ERROR_CODE 5
+#define WODO_KEY_NOT_FOUND_ERROR_CODE 6
 
 typedef struct {
     const char *value;
@@ -22,6 +24,6 @@ Wodo_Config_Value wodo_config_value_from_cstr(const char *string);
 void wodo_setup_config_file_location(const char *filepath);
 uint8_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_Value value);
 uint8_t wodo_remove_config(const Wodo_Config_Key key);
-uint8_t get_config(const Wodo_Config_Key key, Wodo_Config_Value *out);
+uint8_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *out);
 
 #endif // _WODO_CONF_H_
