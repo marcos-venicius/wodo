@@ -17,14 +17,15 @@ typedef struct {
     uint64_t size;
 } Wodo_Config_Key;
 
+typedef uint8_t wodo_error_code_t;
 typedef Wodo_Config_Key Wodo_Config_Value;
 
 Wodo_Config_Key wodo_config_key_from_cstr(const char *string);
 Wodo_Config_Value wodo_config_value_from_cstr(const char *string);
 void wodo_setup_config_file_location(const char *filepath);
-uint8_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_Value value);
-uint8_t wodo_remove_config(const Wodo_Config_Key key);
-uint8_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *out);
+wodo_error_code_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_Value value);
+wodo_error_code_t wodo_remove_config(const Wodo_Config_Key key);
+wodo_error_code_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *out);
 
 // TODO: hash the key using sha1 and compress value. so we can standardize the key and prevent large data being stored.
 //       allow the user to choose if he want to use this approach.
@@ -36,4 +37,7 @@ uint8_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *out);
 //       but, if you'll be using small keys may it does not.
 //
 
+// TODO: allow the user to reuse the same file descriptor that is currently opened to do sequencial operations
+//       so, then it may be more efficient than reopeing the file every single time!
+    
 #endif // _WODO_CONF_H_

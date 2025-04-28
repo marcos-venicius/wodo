@@ -38,15 +38,15 @@ static FILE *open_config_file(void) {
     return fopen(config_filepath, "w+");
 }
 
-static size_t get_file_size(FILE *file) {
+static long get_file_size(FILE *file) {
     fseek(file, 0, SEEK_END);
-    const size_t file_size = ftell(file);
+    const long file_size = ftell(file);
     rewind(file);
 
     return file_size;
 }
 
-static uint8_t read_version(FILE *file, uint8_t *version) {
+static wodo_error_code_t read_version(FILE *file, uint8_t *version) {
     size_t read_size = fread(version, sizeof(uint8_t), 1, file);
 
     if (read_size != sizeof(uint8_t)) return WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE;
@@ -58,7 +58,7 @@ static uint8_t read_version(FILE *file, uint8_t *version) {
     return WODO_INVALID_ROW_VERSION_ERROR_CODE;
 }
 
-static uint8_t read_row_version_001(FILE *file, Version_001_Row **out) {
+static wodo_error_code_t read_row_version_001(FILE *file, Version_001_Row **out) {
     uint8_t empty = 0;
     chunk_t db_key = {0};
     chunk_t db_value = {0};
@@ -156,6 +156,48 @@ static uint8_t read_row_version_001(FILE *file, Version_001_Row **out) {
     return WODO_OK_CODE;
 }
 
+static wodo_error_code_t remove_row_version_001(FILE *file, Version_001_Row *row) {
+    // CAP(uint64_t):SIZE(uint64_t):KEY(char*)
+    uint64_t key_offset = (sizeof(uint64_t) * 2) + (row->key.cap * sizeof(char));
+    // CAP(uint64_t):SIZE(uint64_t):VALUE(char*)
+    uint64_t value_offset = (sizeof(uint64_t) * 2) + (row->value.cap * sizeof(char));
+    // EMPTY(uint8_t)
+    uint64_t empty_offset = sizeof(uint8_t);
+    // VERSION(uint8_t)
+    uint64_t version_offset = sizeof(uint8_t);
+    uint64_t offset = key_offset + value_offset + empty_offset + version_offset;
+
+    if (fseek(file, -((long)(offset - version_offset)), SEEK_CUR) != 0) {
+        fclose(file);
+
+        return WODO_FAIL_UPDATING_KEY_ERROR_CODE;
+    }
+
+    uint8_t empty = 1;
+
+    fwrite(&empty, sizeof(uint8_t), 1, file);
+
+    uint64_t empty_size = 0;
+
+    fseek(file, sizeof(uint64_t), SEEK_CUR); // jumps capacity, live it as it is
+    fwrite(&empty_size, sizeof(uint64_t), 1, file); // update size
+    // FILLING "key" value section with zeros
+    for (uint64_t i = 0; i < row->key.cap; ++i) {
+        fwrite("0", sizeof(char), 1, file); 
+    }
+    fseek(file, sizeof(uint64_t), SEEK_CUR); // jumps capacity, live it as it is
+    fwrite(&empty_size, sizeof(uint64_t), 1, file); // update size
+    // FILLING "value" value section with zeros
+    for (uint64_t i = 0; i < row->value.cap; ++i) {
+        fwrite("0", sizeof(char), 1, file); 
+    }
+
+    free(row->key.value);
+    free(row->value.value);
+
+    return WODO_OK_CODE;
+}
+
 // FILE FORMAT:
 // VERSION(uint8_t):EMPTY(uint8_t):CAP(uint64_t):SIZE(uint64_t):KEY(char*):CAP(uint64_t):SIZE(uint64_t):VALUE(char*)
 // VERSION(uint8_t):EMPTY(uint8_t):CAP(uint64_t):SIZE(uint64_t):KEY(char*):CAP(uint64_t):SIZE(uint64_t):VALUE(char*)
@@ -177,7 +219,7 @@ void wodo_setup_config_file_location(const char *filepath) {
     config_filepath = filepath;
 }
 
-uint8_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_Value value) {
+wodo_error_code_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_Value value) {
     if (config_filepath == NULL) {
         return WODO_MISSING_CONFIG_FILE_LOCATION_ERROR_CODE;
     }
@@ -188,7 +230,7 @@ uint8_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_Value value
         return WODO_FAIL_OPENING_CONFIG_FILE_ERROR_CODE;
     }
 
-    size_t file_size = get_file_size(file);
+    long file_size = get_file_size(file);
 
     chunk_t db_key;
     chunk_t db_value;
@@ -196,7 +238,9 @@ uint8_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_Value value
     uint8_t empty = 0;
     bool equal_key = false;
 
-    while (file_size > 0) {
+    while (true) {
+        if (ftell(file) >= file_size) break;
+
         equal_key = false;
         version = 0;
         empty = 0;
@@ -402,7 +446,7 @@ uint8_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_Value value
     return WODO_OK_CODE;
 }
 
-uint8_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *out) {
+wodo_error_code_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *out) {
     if (config_filepath == NULL) return WODO_MISSING_CONFIG_FILE_LOCATION_ERROR_CODE;
 
     if (out == NULL) return WODO_OK_CODE;
@@ -411,7 +455,11 @@ uint8_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *out) {
 
     if (file == NULL) return WODO_FAIL_OPENING_CONFIG_FILE_ERROR_CODE;
 
+    long file_size = get_file_size(file);
+
     while (true) {
+        if (ftell(file) >= file_size) break;
+
         uint8_t result_code = 0;
         uint8_t version = 0;
 
@@ -432,6 +480,8 @@ uint8_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *out) {
                 if (row == NULL) break;
                 
                 if (cmp_sized_strings(row->key.value, row->key.size, key.value, key.size)) {
+                    fclose(file);
+
                     *out = (Wodo_Config_Value){
                         .size = row->value.size,
                         .value = row->value.value
@@ -447,7 +497,56 @@ uint8_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *out) {
         }
     }
 
+    fclose(file);
+
     return WODO_KEY_NOT_FOUND_ERROR_CODE;
 }
 
-uint8_t wodo_remove_config(const Wodo_Config_Key key);
+wodo_error_code_t wodo_remove_config(const Wodo_Config_Key key) {
+    if (config_filepath == NULL) return WODO_MISSING_CONFIG_FILE_LOCATION_ERROR_CODE;
+
+    FILE *file = open_config_file();
+
+    if (file == NULL) return WODO_FAIL_OPENING_CONFIG_FILE_ERROR_CODE;
+
+    long file_size = get_file_size(file);
+    uint8_t result_code = WODO_OK_CODE;
+
+    while (true) {
+        if (ftell(file) >= file_size) break;
+
+        uint8_t version = 0;
+
+        if ((result_code = read_version(file, &version)) != WODO_OK_CODE) {
+            fclose(file);
+
+            return result_code;
+        }
+
+        switch (version) {
+            case VERSION_001: {
+                Version_001_Row *row = NULL;
+
+                if ((result_code = read_row_version_001(file, &row)) != WODO_OK_CODE) {
+                    return result_code;
+                }
+
+                if (row == NULL) break;
+                
+                if (cmp_sized_strings(row->key.value, row->key.size, key.value, key.size)) {
+                    result_code = remove_row_version_001(file, row);
+
+                    goto defer;
+                }
+
+                free(row->key.value);
+                free(row->value.value);
+            } break;
+            default: return WODO_INVALID_ROW_VERSION_ERROR_CODE;
+        }
+    }
+
+defer:
+    fclose(file);
+    return result_code;
+}
