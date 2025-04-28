@@ -26,4 +26,14 @@ uint8_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_Value value
 uint8_t wodo_remove_config(const Wodo_Config_Key key);
 uint8_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *out);
 
+// TODO: hash the key using sha1 and compress value. so we can standardize the key and prevent large data being stored.
+//       allow the user to choose if he want to use this approach.
+//
+//       The user should be able to compress specific rows, then it'll be saved in the row if the data is compressed.
+//       If it is, so, decompress before returning to the user.
+//
+//       Also allow the user to specify if he wants to use sha1 because sometimes, when using big keys, it may worth it
+//       but, if you'll be using small keys may it does not.
+//
+
 #endif // _WODO_CONF_H_
