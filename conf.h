@@ -20,6 +20,8 @@ typedef struct {
 typedef uint8_t wodo_error_code_t;
 typedef Wodo_Config_Key Wodo_Config_Value;
 
+const char *wodo_error_string(wodo_error_code_t code);
+
 Wodo_Config_Key wodo_config_key_from_cstr(const char *string);
 Wodo_Config_Value wodo_config_value_from_cstr(const char *string);
 void wodo_setup_config_file_location(const char *filepath);

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <assert.h>
 
 #define VERSION_001 1
 
@@ -203,6 +204,20 @@ static wodo_error_code_t remove_row_version_001(FILE *file, Version_001_Row *row
 // VERSION(uint8_t):EMPTY(uint8_t):CAP(uint64_t):SIZE(uint64_t):KEY(char*):CAP(uint64_t):SIZE(uint64_t):VALUE(char*)
 // VERSION(uint8_t):EMPTY(uint8_t):CAP(uint64_t):SIZE(uint64_t):KEY(char*):CAP(uint64_t):SIZE(uint64_t):VALUE(char*)
 // VERSION(uint8_t):EMPTY(uint8_t):CAP(uint64_t):SIZE(uint64_t):KEY(char*):CAP(uint64_t):SIZE(uint64_t):VALUE(char*)
+
+const char *wodo_error_string(wodo_error_code_t code) {
+    switch (code) {
+        case WODO_OK_CODE: return "OK";
+        case WODO_MISSING_CONFIG_FILE_LOCATION_ERROR_CODE: return "MISSING_CONFIG_FILE_LOCATION";
+        case WODO_FAIL_OPENING_CONFIG_FILE_ERROR_CODE: return "FAIL_OPENING_CONFIG_FILE";
+        case WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE: return "CORRUPTED_CONFIG_FILE";
+        case WODO_FAIL_UPDATING_KEY_ERROR_CODE: return "FAIL_UPDATING_KEY";
+        case WODO_INVALID_ROW_VERSION_ERROR_CODE: return "INVALID_ROW_VERSION";
+        case WODO_KEY_NOT_FOUND_ERROR_CODE: return "KEY_NOT_FOUND";
+    }
+
+    assert(0 && "TODO: missing update wodo_error_string");
+}
 
 Wodo_Config_Key wodo_config_key_from_cstr(const char *string) {
     return wodo_config_value_from_cstr(string);

@@ -42,16 +42,11 @@ int main(int argc, char **argv) {
 
             wodo_error_code_t code = wodo_set_config(wodo_config_key_from_cstr(key), wodo_config_value_from_cstr(value));
 
-            switch (code) {
-                case WODO_OK_CODE: printf("success\n"); return 0;
-                case WODO_MISSING_CONFIG_FILE_LOCATION_ERROR_CODE: printf("missing config file location\n"); return 1;
-                case WODO_FAIL_OPENING_CONFIG_FILE_ERROR_CODE: printf("fail opening config file\n"); return 1;
-                case WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE: printf("corrupted file\n"); return 1;
-                case WODO_FAIL_UPDATING_KEY_ERROR_CODE: printf("fail updating key\n"); return 1;
-                case WODO_INVALID_ROW_VERSION_ERROR_CODE: printf("invalid row version\n"); return 1;
-                case WODO_KEY_NOT_FOUND_ERROR_CODE: printf("key not found\n"); return 1;
-                default: printf("something is really wrong!\n"); return 1;
-            }
+            printf("result: %s\n", wodo_error_string(code));
+
+            if (code != WODO_OK_CODE) return 1;
+
+            return 0;
         } else if (arg_cmp(arg, "get", "g")) {
             const char *key = shift(&argc, &argv);
             if (key == NULL) {
@@ -64,16 +59,12 @@ int main(int argc, char **argv) {
 
             wodo_error_code_t code = wodo_get_config(wodo_config_key_from_cstr(key), &value);
 
-            switch (code) {
-                case WODO_OK_CODE: printf("%.*s\n", (int)value.size, value.value);return 0;
-                case WODO_MISSING_CONFIG_FILE_LOCATION_ERROR_CODE: printf("missing config file location\n"); return 1;
-                case WODO_FAIL_OPENING_CONFIG_FILE_ERROR_CODE: printf("fail opening config file\n"); return 1;
-                case WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE: printf("corrupted file\n"); return 1;
-                case WODO_FAIL_UPDATING_KEY_ERROR_CODE: printf("fail updating key\n"); return 1;
-                case WODO_INVALID_ROW_VERSION_ERROR_CODE: printf("invalid row version\n"); return 1;
-                case WODO_KEY_NOT_FOUND_ERROR_CODE: printf("key not found\n"); return 1;
-                default: printf("something is really wrong!\n"); return 1;
-            }
+            printf("result: %s\n", wodo_error_string(code));
+
+            if (code != WODO_OK_CODE) return 1;
+
+            printf("value: \"%.*s\"\n", (int)value.size, value.value);
+            return 0;
         } else if (arg_cmp(arg, "remove", "r")) {
             const char *key = shift(&argc, &argv);
 
@@ -85,16 +76,11 @@ int main(int argc, char **argv) {
 
             wodo_error_code_t code = wodo_remove_config(wodo_config_key_from_cstr(key));
 
-            switch (code) {
-                case WODO_OK_CODE: printf("success\n");return 0;
-                case WODO_MISSING_CONFIG_FILE_LOCATION_ERROR_CODE: printf("missing config file location\n"); return 1;
-                case WODO_FAIL_OPENING_CONFIG_FILE_ERROR_CODE: printf("fail opening config file\n"); return 1;
-                case WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE: printf("corrupted file\n"); return 1;
-                case WODO_FAIL_UPDATING_KEY_ERROR_CODE: printf("fail updating key\n"); return 1;
-                case WODO_INVALID_ROW_VERSION_ERROR_CODE: printf("invalid row version\n"); return 1;
-                case WODO_KEY_NOT_FOUND_ERROR_CODE: printf("key not found\n"); return 1;
-                default: printf("something is really wrong!\n"); return 1;
-            }
+            printf("result: %s\n", wodo_error_string(code));
+
+            if (code != WODO_OK_CODE) return 1;
+
+            return 0;
         }
 
         printf("unkown command: %s\n", arg);
