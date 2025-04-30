@@ -55,5 +55,5 @@ Maybe I'll update this project to allow you to:
 
 and some other stuff.
 
-**And of course, I need to refactor this mess of almost 1000 lines main.c file**
+**And of course, I need to refactor this mess of almost _2000_ lines main.c file (now) :)**
 
