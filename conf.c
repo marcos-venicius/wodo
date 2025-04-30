@@ -7,6 +7,12 @@
 #include <assert.h>
 
 #define VERSION_001 1
+#define VERSION_SIZE sizeof(uint8_t)
+#define EMPTY_SIZE sizeof(uint8_t)
+#define KEY_CAP_SIZE sizeof(uint64_t)
+#define KEY_SIZE_SIZE sizeof(uint64_t)
+#define VALUE_CAP_SIZE sizeof(uint64_t)
+#define VALUE_SIZE_SIZE sizeof(uint64_t)
 
 typedef struct {
     uint64_t size;
@@ -48,7 +54,7 @@ static long get_file_size(FILE *file) {
 }
 
 static wodo_error_code_t read_version(FILE *file, uint8_t *version) {
-    size_t read_size = fread(version, sizeof(uint8_t), 1, file);
+    size_t read_size = fread(version, VERSION_SIZE, 1, file);
 
     if (read_size != sizeof(uint8_t)) return WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE;
 
@@ -64,7 +70,7 @@ static wodo_error_code_t read_row_version_001(FILE *file, Version_001_Row **out)
     chunk_t db_key = {0};
     chunk_t db_value = {0};
 
-    size_t read_size = fread(&empty, sizeof(uint8_t), 1, file);
+    size_t read_size = fread(&empty, EMPTY_SIZE, 1, file);
 
     if (read_size != 1 || (empty != 0 && empty != 1)) {
         fclose(file);
@@ -72,13 +78,13 @@ static wodo_error_code_t read_row_version_001(FILE *file, Version_001_Row **out)
         return WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE;
     }
 
-    if (fread(&db_key.cap, sizeof(uint64_t), 1, file) != 1) {
+    if (fread(&db_key.cap, KEY_CAP_SIZE, 1, file) != 1) {
         fclose(file);
 
         return WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE;
     }
 
-    if (fread(&db_key.size, sizeof(uint64_t), 1, file) != 1) {
+    if (fread(&db_key.size, KEY_SIZE_SIZE, 1, file) != 1) {
         fclose(file);
 
         return WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE;
@@ -109,13 +115,13 @@ static wodo_error_code_t read_row_version_001(FILE *file, Version_001_Row **out)
         }
     }
 
-    if (fread(&db_value.cap, sizeof(uint64_t), 1, file) != 1) {
+    if (fread(&db_value.cap, VALUE_CAP_SIZE, 1, file) != 1) {
         fclose(file);
 
         return WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE;
     }
 
-    if (fread(&db_value.size, sizeof(uint64_t), 1, file) != 1) {
+    if (fread(&db_value.size, VALUE_SIZE_SIZE, 1, file) != 1) {
         fclose(file);
 
         return WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE;
@@ -159,16 +165,18 @@ static wodo_error_code_t read_row_version_001(FILE *file, Version_001_Row **out)
 
 static wodo_error_code_t remove_row_version_001(FILE *file, Version_001_Row *row) {
     // CAP(uint64_t):SIZE(uint64_t):KEY(char*)
-    uint64_t key_offset = (sizeof(uint64_t) * 2) + (row->key.cap * sizeof(char));
+    uint64_t key_offset = (KEY_CAP_SIZE + KEY_SIZE_SIZE) + (row->key.cap * sizeof(char));
     // CAP(uint64_t):SIZE(uint64_t):VALUE(char*)
-    uint64_t value_offset = (sizeof(uint64_t) * 2) + (row->value.cap * sizeof(char));
+    uint64_t value_offset = (VALUE_CAP_SIZE + VALUE_SIZE_SIZE) + (row->value.cap * sizeof(char));
     // EMPTY(uint8_t)
-    uint64_t empty_offset = sizeof(uint8_t);
+    uint64_t empty_offset = EMPTY_SIZE;
     // VERSION(uint8_t)
-    uint64_t version_offset = sizeof(uint8_t);
-    uint64_t offset = key_offset + value_offset + empty_offset + version_offset;
+    uint64_t version_offset = VERSION_SIZE;
+    uint64_t offset = version_offset + empty_offset + key_offset + value_offset;
 
-    if (fseek(file, -((long)(offset - version_offset)), SEEK_CUR) != 0) {
+    long goto_empty_offset = offset - version_offset;
+
+    if (fseek(file, -goto_empty_offset, SEEK_CUR) != 0) {
         fclose(file);
 
         return WODO_FAIL_UPDATING_KEY_ERROR_CODE;
@@ -176,21 +184,31 @@ static wodo_error_code_t remove_row_version_001(FILE *file, Version_001_Row *row
 
     uint8_t empty = 1;
 
-    fwrite(&empty, sizeof(uint8_t), 1, file);
+    fwrite(&empty, EMPTY_SIZE, 1, file);
 
-    uint64_t empty_size = 0;
+    uint64_t empty_value = 0;
 
-    fseek(file, sizeof(uint64_t), SEEK_CUR); // jumps capacity, live it as it is
-    fwrite(&empty_size, sizeof(uint64_t), 1, file); // update size
-    // FILLING "key" value section with zeros
-    for (uint64_t i = 0; i < row->key.cap; ++i) {
-        fwrite("0", sizeof(char), 1, file); 
+     // jumps capacity, live it as it is
+    if (fseek(file, KEY_CAP_SIZE, SEEK_CUR) != 0) {
+        return WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE;
     }
-    fseek(file, sizeof(uint64_t), SEEK_CUR); // jumps capacity, live it as it is
-    fwrite(&empty_size, sizeof(uint64_t), 1, file); // update size
-    // FILLING "value" value section with zeros
-    for (uint64_t i = 0; i < row->value.cap; ++i) {
-        fwrite("0", sizeof(char), 1, file); 
+
+    fwrite(&empty_value, KEY_SIZE_SIZE, 1, file); // update size
+
+    // jumping key
+    if (fseek(file, row->key.cap * sizeof(char), SEEK_CUR) != 0) {
+        return WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE;
+    }
+
+    // jumps capacity, live it as it is
+    if (fseek(file, VALUE_CAP_SIZE, SEEK_CUR) != 0) {
+        return WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE;
+    }
+    fwrite(&empty_value, VALUE_SIZE_SIZE, 1, file); // update size
+
+    // jumping value
+    if (fseek(file, row->value.cap * sizeof(char), SEEK_CUR) != 0) {
+        return WODO_CORRUPTED_CONFIG_FILE_ERROR_CODE;
     }
 
     free(row->key.value);
@@ -358,14 +376,14 @@ wodo_error_code_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_V
         }
 
         // CAP(uint64_t):SIZE(uint64_t):KEY(char*)
-        uint64_t key_offset = (sizeof(uint64_t) * 2) + (db_key.cap * sizeof(char));
+        uint64_t key_offset = (KEY_CAP_SIZE + KEY_SIZE_SIZE) + (db_key.cap * sizeof(char));
         // CAP(uint64_t):SIZE(uint64_t):VALUE(char*)
-        uint64_t value_offset = (sizeof(uint64_t) * 2) + (db_value.cap * sizeof(char));
+        uint64_t value_offset = (VALUE_CAP_SIZE + VALUE_SIZE_SIZE) + (db_value.cap * sizeof(char));
         // EMPTY(uint8_t)
-        uint64_t empty_offset = sizeof(uint8_t);
+        uint64_t empty_offset = EMPTY_SIZE;
         // VERSION(uint8_t)
-        uint64_t version_offset = sizeof(uint8_t);
-        uint64_t offset = key_offset + value_offset + empty_offset + version_offset;
+        uint64_t version_offset = VERSION_SIZE;
+        uint64_t offset = version_offset + empty_offset + key_offset + value_offset;
 
         if (empty == 1) {
             if (db_key.cap >= key.size && db_value.cap >= value.size) {
@@ -391,52 +409,41 @@ wodo_error_code_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_V
 
                 break;
             } else {
-                // VERSION(uint8_t):EMPTY(uint8_t):CAP(uint64_t):SIZE(uint64_t):KEY(char*):CAP(uint64_t):SIZE(uint64_t):VALUE(char*)
-                // Here, we are marking this row as unused because there is other rows with same name
-                // that is bigger than this one
-                if (fseek(file, -((long)(offset - version_offset)), SEEK_CUR) != 0) {
-                    fclose(file);
+                switch (version) {
+                    case VERSION_001: {
+                        Version_001_Row row = (Version_001_Row){
+                            .key = db_key,
+                            .value = db_value,
+                            .is_empty = false
+                        };
 
-                    return WODO_FAIL_UPDATING_KEY_ERROR_CODE;
-                }
+                        wodo_error_code_t code = remove_row_version_001(file, &row);
 
-                empty = 1;
-
-                fwrite(&empty, sizeof(uint8_t), 1, file);
-
-                uint64_t empty_size = 0;
-
-                fseek(file, sizeof(uint64_t), SEEK_CUR); // jumps capacity, live it as it is
-                fwrite(&empty_size, sizeof(uint64_t), 1, file); // update size
-                // FILLING "key" value section with zeros
-                for (uint64_t i = 0; i < db_key.cap; ++i) {
-                    fwrite("0", sizeof(char), 1, file); 
-                }
-                fseek(file, sizeof(uint64_t), SEEK_CUR); // jumps capacity, live it as it is
-                fwrite(&empty_size, sizeof(uint64_t), 1, file); // update size
-                // FILLING "value" value section with zeros
-                for (uint64_t i = 0; i < db_value.cap; ++i) {
-                    fwrite("0", sizeof(char), 1, file); 
+                        if (code != WODO_OK_CODE) return code;
+                    } break;
+                    default: return WODO_INVALID_ROW_VERSION_ERROR_CODE;
                 }
             }
         }
     }
 
+    bool jump_capacity = equal_key && empty == 1;
+
     empty = 0;
 
-    fwrite(&CURRENT_VERSION, sizeof(uint8_t), 1, file);
-    fwrite(&empty, sizeof(uint8_t), 1, file);
+    fwrite(&CURRENT_VERSION, VERSION_SIZE, 1, file);
+    fwrite(&empty, EMPTY_SIZE, 1, file);
 
-    if (equal_key) {
-        fseek(file, sizeof(uint64_t), SEEK_CUR); // jumps capacity, live it as it is
+    if (jump_capacity) {
+        fseek(file, KEY_CAP_SIZE, SEEK_CUR); // jumps capacity, live it as it is
     } else {
-        fwrite(&key.size, sizeof(uint64_t), 1, file); // update capacity
+        fwrite(&key.size, KEY_CAP_SIZE, 1, file); // update capacity
     }
 
-    fwrite(&key.size, sizeof(uint64_t), 1, file); // update size
+    fwrite(&key.size, KEY_SIZE_SIZE, 1, file); // update size
     fwrite(key.value, sizeof(char), key.size, file); 
 
-    if (equal_key) {
+    if (jump_capacity) {
         // this check if I have some "unused space" and jump it
         uint64_t key_cap_size_padding = db_key.cap - key.size;
 
@@ -448,12 +455,12 @@ wodo_error_code_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_V
             }
         }
 
-        fseek(file, sizeof(uint64_t), SEEK_CUR); // jumps capacity, live it as it is
+        fseek(file, VALUE_CAP_SIZE, SEEK_CUR); // jumps capacity, live it as it is
     } else {
-        fwrite(&value.size, sizeof(uint64_t), 1, file); // update capacity
+        fwrite(&value.size, VALUE_CAP_SIZE, 1, file); // update capacity
     }
 
-    fwrite(&value.size, sizeof(uint64_t), 1, file); // update size
+    fwrite(&value.size, VALUE_SIZE_SIZE, 1, file); // update size
     fwrite(value.value, sizeof(char), value.size, file);
 
     fclose(file);
@@ -525,9 +532,11 @@ wodo_error_code_t wodo_remove_config(const Wodo_Config_Key key) {
     if (file == NULL) return WODO_FAIL_OPENING_CONFIG_FILE_ERROR_CODE;
 
     long file_size = get_file_size(file);
-    uint8_t result_code = WODO_OK_CODE;
+    uint8_t result_code;
 
     while (true) {
+        result_code = WODO_OK_CODE;
+
         if (ftell(file) >= file_size) break;
 
         uint8_t version = 0;
@@ -548,20 +557,17 @@ wodo_error_code_t wodo_remove_config(const Wodo_Config_Key key) {
 
                 if (row == NULL) break;
                 
-                if (cmp_sized_strings(row->key.value, row->key.size, key.value, key.size)) {
-                    result_code = remove_row_version_001(file, row);
-
-                    goto defer;
+                if (!row->is_empty && cmp_sized_strings(row->key.value, row->key.size, key.value, key.size)) {
+                    if ((result_code = remove_row_version_001(file, row)) != WODO_OK_CODE) return result_code;
+                } else {
+                    free(row->key.value);
+                    free(row->value.value);
                 }
-
-                free(row->key.value);
-                free(row->value.value);
             } break;
             default: return WODO_INVALID_ROW_VERSION_ERROR_CODE;
         }
     }
 
-defer:
     fclose(file);
     return result_code;
 }

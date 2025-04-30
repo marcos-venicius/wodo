@@ -42,17 +42,4 @@ wodo_error_code_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *
 // TODO: allow the user to reuse the same file descriptor that is currently opened to do sequencial operations
 //       so, then it may be more efficient than reopeing the file every single time!
     
-// FIXME:
-//
-// wodo$ ./test add "hello world" "hello guys! how are you?"
-// success
-// wodo$ ./test add "hello world" "hello guys! how are you? can you answer me?"
-// success
-// wodo$ ./test add "hello world" "testing"
-// success
-// wodo$
-//
-// This error occours because when it finds an empty slot, it doesn't check next rows to see if there is a key with this name
-// so, we'll have two of them. I need to think in a clever way to handle this.
-    
 #endif // _WODO_CONF_H_
