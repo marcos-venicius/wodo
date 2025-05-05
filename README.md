@@ -8,6 +8,8 @@ Everytime you want to check all of your todos you can just do `wodo view`, this 
 
 To use it, you need to add some configurations to vim:
 
+**requires you to have openssl**
+
 ```vim
 function! AddTodoBoilerplate()
     let l:date = strftime("%A %d-%m-%y %H:%M - %H:%M")

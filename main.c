@@ -5,17 +5,21 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
-#include <pwd.h>
 #include <assert.h>
 #include <wchar.h>
 #include <sys/wait.h>
 #include <time.h>
+#include "./database.h"
+#include "crypt.h"
 
 #define DB_FILENAME ".wodo.db"
 #define CONFIG_FILENAME ".wodo.conf.db"
 #define MAX_FILENAME_SIZE 255
 #define MAX_FILTER_SIZE 10
 #define DB_FILEPATH_MAX_BUFFER (MAX_FILENAME_SIZE + MAX_FILENAME_SIZE + MAX_FILENAME_SIZE) // /<home>/<user>/file
+
+// initialized in `main`
+static Database global_database;
 
 // ---------------------------------------- Utils Start ----------------------------------------
 
@@ -96,41 +100,17 @@ static size_t read_file(const char *filename, char **content) {
     return stream_size;
 }
 
-static bool file_exists(const char *filepath) {
-    return access(filepath, F_OK) == 0;
-}
-
-static const char *get_user_home_folder(void) {
-    const char *home = getenv("HOME");
-
-    if (home == NULL) return getpwuid(getuid())->pw_dir;
-
-    return home;
-}
-
-static bool compare_paths(const char *a, const char *b) {
-    size_t i = 0;
-
-    while (i < MAX_FILENAME_SIZE) {
-        if (a[i] != b[i]) return false;
-
-        if (a[i] == '\0' && b[i] == '\0') return true;
-
-        i++;
-    }
-
-    return false;
-}
-
-static bool is_number(const char *string) {
-    for (size_t i = 0; string[i] != '\0'; ++i)
-        if (!(string[i] >= '0' && string[i] <= '9')) return false;
-
-    return true;
-}
-
 static inline bool is_symbol(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+static void show_current_selected_file(const Database *database) {
+    (void)database;
+    // TODO: use config.h to display current selected file
+    return;
+    /* if (database->selected_file == NULL) return;
+
+    fprintf(stdout, "current selected file: [ID:%ld] %s\n\n", database->selected_file->id, database->selected_file->filepath); */
 }
 
 // ---------------------------------------- Utils End ----------------------------------------
@@ -149,31 +129,9 @@ typedef enum {
 
 typedef struct {
     ArgumentKind kind;
-    const char *value;
+    char *arg1;
+    char *arg2;
 } Arguments;
-
-typedef struct DbFile DbFile;
-
-struct DbFile {
-    size_t id;
-    char *filepath;
-
-    DbFile *next;
-};
-
-typedef struct {
-    // it's by default 0, meaning empty or unselected
-    size_t current_selected_file_id;
-
-    // files
-    size_t last_file_id;
-    size_t files_count;
-    DbFile *files_head;
-    DbFile *files_tail;
-
-    // only view fields (these are not saved to the disk)
-    DbFile *selected_file;
-} Database;
 
 typedef enum {
     TK_TEXT = 0,    // any text like: x, Todo, or "Lesson 011 sdlk", ...
@@ -203,191 +161,6 @@ typedef struct {
     Token *head;
     Token *tail;
 } Lexer;
-
-// ---------------------------------------- Database Start ----------------------------------------
-
-static const char *get_database_filepath(void) {
-    const char *user_home_folder = get_user_home_folder();
-
-    static char database_filepath[DB_FILEPATH_MAX_BUFFER];
-
-    snprintf(database_filepath, sizeof(database_filepath), "%s/%s", user_home_folder, DB_FILENAME);
-
-    return database_filepath;
-}
-
-// this also loads the selected file if it's the one
-static void load_filepath_on_database(Database *database, char *filepath, size_t id) {
-    DbFile *file = malloc(sizeof(DbFile));
-
-    if (file == NULL) {
-        fprintf(stderr, "ERROR: could not load file \"%s\" to database: %s\n", filepath, strerror(errno));
-        exit(1);
-    }
-
-    file->id = id;
-    file->filepath = strdup(filepath);
-
-    if (file->filepath == NULL) {
-        fprintf(stderr, "ERROR: could not allocate memory for file path: %s\n", strerror(errno));
-        exit(1);
-    }
-
-    file->next = NULL;
-
-    if (database->files_head == NULL) {
-        database->files_head = file;
-        database->files_tail = file;
-    } else {
-        database->files_tail = database->files_tail->next = file;
-    }
-
-    if (database->current_selected_file_id == id) {
-        database->selected_file = file;
-    }
-}
-
-static Database load_database(void) {
-    const char *database_filepath = get_database_filepath();
-
-    Database database = {0};
-
-    if (file_exists(database_filepath)) {
-        FILE *file = fopen(database_filepath, "rb");
-
-        if (file == NULL) {
-            fprintf(stderr, "could not open database file: %s\n", strerror(errno));
-            exit(1);
-        }
-
-        fread(&database.current_selected_file_id, sizeof(size_t), 1, file);
-        fread(&database.files_count, sizeof(size_t), 1, file);
-        fread(&database.last_file_id, sizeof(size_t), 1, file);
-
-        for (size_t i = 0; i < database.files_count; ++i) {
-            size_t filepath_size;
-            size_t id;
-
-            fread(&id, sizeof(size_t), 1, file);
-            fread(&filepath_size, sizeof(size_t), 1, file);
-
-            char *filepath = malloc(filepath_size);
-
-            if (filepath == NULL) {
-                fprintf(stderr, "coult not allocate %ld byte for db file path: %s\n", filepath_size, strerror(errno));
-                exit(1);
-            }
-
-            fread(filepath, sizeof(char), filepath_size, file);
-
-            load_filepath_on_database(&database, filepath, id);
-
-            free(filepath);
-        }
-    }
-
-    return database;
-}
-
-static void save_database(Database *database) {
-    const char *database_filepath = get_database_filepath();
-
-    FILE *file = fopen(database_filepath, "wb");
-
-    if (file == NULL) {
-        fprintf(stderr, "could not open database file: %s\n", strerror(errno));
-        exit(1);
-    }
-
-    fwrite(&database->current_selected_file_id, sizeof(size_t), 1, file);
-
-    fwrite(&database->files_count, sizeof(size_t), 1, file);
-    fwrite(&database->last_file_id, sizeof(size_t), 1, file);
-
-    for (DbFile *db_file = database->files_head; db_file != NULL; db_file = db_file->next) {
-        size_t filepath_size = strlen(db_file->filepath) + 1;
-
-        fwrite(&db_file->id, sizeof(size_t), 1, file);
-        fwrite(&filepath_size, sizeof(size_t), 1, file);
-        fwrite(db_file->filepath, sizeof(char), filepath_size, file);
-    }
-
-    fclose(file);
-}
-
-static size_t gen_id(Database *database) {
-    return ++database->last_file_id;
-}
-
-static void free_database(Database *database) {
-    DbFile *file = database->files_head;
-
-    while (file != NULL) {
-        DbFile *next = file->next;
-
-        free(file->filepath);
-        free(file);
-
-        file = next;
-    }
-}
-
-static bool filepath_exists_on_database(Database *database, const char *filepath) {
-    for (DbFile *file = database->files_head; file != NULL; file = file->next)
-        if (compare_paths(filepath, file->filepath)) return true;
-
-    return false;
-}
-
-static DbFile *get_database_file_by_id(const Database *database, size_t id) {
-    for (DbFile *file = database->files_head; file != NULL; file = file->next)
-        if (file->id == id) return file;
-
-    return NULL;
-}
-
-// The path should be an absolute path
-static DbFile *get_database_file_by_filepath(const Database *database, const char *filepath) {
-    DbFile *curr = database->files_head;
-
-    while (curr != NULL) {
-        if (compare_paths(curr->filepath, filepath)) break;
-
-        curr = curr->next;
-    }
-
-    return curr;
-}
-
-static void add_file_to_database(Database *database, const char *filepath) {
-    DbFile *file = malloc(sizeof(DbFile));
-
-    if (file == NULL) {
-        fprintf(stderr, "ERROR: could not add file \"%s\" to database: %s\n", filepath, strerror(errno));
-        exit(1);
-    }
-
-    file->filepath = strdup(filepath);
-
-    if (file->filepath == NULL) {
-        fprintf(stderr, "ERROR: could not allocate memory for file path: %s\n", strerror(errno));
-        exit(1);
-    }
-
-    file->id = gen_id(database);
-    file->next = NULL;
-
-    if (database->files_head == NULL) {
-        database->files_head = file;
-        database->files_tail = file;
-    } else {
-        database->files_tail = database->files_tail->next = file;
-    }
-
-    database->files_count++;
-}
-
-// ---------------------------------------- Database End ----------------------------------------
 
 // ---------------------------------------- Lexer Start ----------------------------------------
 
@@ -1180,26 +953,35 @@ static inline bool arg_cmp(const char *actual, const char *expected, const char 
     return strncmp(actual, expected, strlen(actual)) == 0 || strncmp(actual, alternative, strlen(actual)) == 0;
 }
 
-static void show_current_selected_file(const Database *database) {
-    if (database->selected_file == NULL) return;
-
-    fprintf(stdout, "current selected file: [ID:%ld] %s\n\n", database->selected_file->id, database->selected_file->filepath);
-}
-
-static int add_action(const char *filename) {
-    Database database = load_database();
-
-    char *abs_path = realpath(filename, NULL);
+static int add_action(char *name, char *filepath) {
+    char *abs_path = realpath(filepath, NULL);
 
     if (abs_path == NULL) {
-        fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
+        fprintf(stderr, "\033[1;31merror:\033[0m invalid filepath\n");
 
         return 1;
     }
 
-    if (filepath_exists_on_database(&database, abs_path)) {
-        fprintf(stderr, "\033[1;31merror:\033[0m you already have this file added\n");
-        return 1;
+    Database_Db_File file = {
+        .deleted = false,
+        .filepath = abs_path,
+        .name = name,
+    };
+
+    unsigned char *hash = hash_bytes(filepath, strlen(filepath));
+
+    memcpy(file.large_identifier, hash, LARGE_IDENTIFIER_SIZE);
+    memcpy(file.short_identifier, hash, SHORT_IDENTIFIER_SIZE);
+
+    free(hash);
+
+    database_status_code_t status_code = database_add_file(&global_database, &file);
+    
+    if (status_code != DATABASE_OK_STATUS_CODE) {
+        database_free(&global_database);
+        fprintf(stderr, "\033[1;31merror:\033[0m could not add file due to: %s\n", database_status_code_string(status_code));
+
+        return status_code;
     }
 
     char *content;
@@ -1208,162 +990,125 @@ static int add_action(const char *filename) {
 
     free_lines(compile_file(content, content_size));
 
-    add_file_to_database(&database, abs_path);
-
-    save_database(&database);
-
     free(content);
-    free_database(&database);
+    database_save(&global_database);
+    database_free(&global_database);
     free(abs_path);
 
     return 0;
 }
 
-// `file_identifier` can be an Id or the path to the file
-static int remove_action(const char *file_identifier) {
-    Database database = load_database();
+// `file_identifier` is the sha1
+static int remove_action(const char file_identifier[40]) {
+    database_status_code_t status_code;
 
-    size_t id = 0;
-
-    if (file_identifier == NULL) {
+    // TODO: use config.h
+    /* if (file_identifier == NULL) {
         id = database.current_selected_file_id;
-    } else if (is_number(file_identifier)) {
-        id = strtoul(file_identifier, NULL, 10);
-    } else {
-        char *abs_path = realpath(file_identifier, NULL);
+    } else  */
 
-        if (abs_path == NULL) {
-            fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
+    Database_Db_File *file = NULL;
 
-            return 1;
-        }
+    status_code = database_get_file_by_identifier(&file, &global_database, file_identifier);
 
-        DbFile *file = get_database_file_by_filepath(&database, abs_path);
+    if (status_code == DATABASE_NOT_FOUND_STATUS_CODE) {
+        database_free(&global_database);
 
-        if (file == NULL) return 0;
-
-        id = file->id;
+        return 0;
     }
 
-    // TODO: abstract this to a function
-    DbFile *slow = NULL;
-    DbFile *fast = database.files_head;
+    if (status_code != DATABASE_OK_STATUS_CODE) {
+        database_free(&global_database);
 
-    while (fast != NULL) {
-        if (fast->id == id) {
-            if (id == database.current_selected_file_id) {
-                database.current_selected_file_id = 0;
-            }
-
-            if (slow == NULL) {
-                database.files_head = fast->next;
-            } else {
-                slow->next = fast->next;
-            }
-
-            if (database.files_tail == fast) {
-                database.files_tail = slow;
-            }
-
-            free(fast->filepath);
-            free(fast);
-
-            database.files_count--;
-
-            break;
-        }
-
-        slow = fast;
-        fast = fast->next;
+        return status_code;
     }
 
-    save_database(&database);
-    free_database(&database);
+    if (file == NULL) return 0;
+
+    database_delete_file(file);
+
+    database_save(&global_database);
+    database_free(&global_database);
 
     return 0;
 }
 
 static int view_action(void) {
-    Database database = load_database();
-
-    if (database.files_count == 0) {
+    if (global_database.length == 0) {
         return 0;
     }
 
-    show_current_selected_file(&database);
+    show_current_selected_file(&global_database);
 
-    for (DbFile *file = database.files_head; file != NULL; file = file->next) {
-        printf("[ID:%ld] %s\n", file->id, file->filepath);
+    database_foreach_begin(global_database) {
+        printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
 
         char *content;
 
-        size_t content_size = read_file(file->filepath, &content);
+        size_t content_size = read_file(it->filepath, &content);
 
         Line *lines = compile_file(content, content_size);
 
         printf("\n");
         display_lines_and_free(lines, "    ");
 
-        if (file->next != NULL) {
+         if (i < global_database.length - 1) {
             printf("\n");
         }
 
         free(content);
-    }
+        free_lines(lines);
+   } database_foreach_end;
+
     printf("\n");
 
-    free_database(&database);
+    database_free(&global_database);
 
     return 0;
 }
 
 static int today_action(void) {
+    show_current_selected_file(&global_database);
 
-    Database database = load_database();
-
-    show_current_selected_file(&database);
-
-    for (DbFile *file = database.files_head; file != NULL; file = file->next) {
+    database_foreach_begin(global_database) {
         char *content;
 
-        size_t content_size = read_file(file->filepath, &content);
+        size_t content_size = read_file(it->filepath, &content);
 
         Line *lines = compile_file(content, content_size);
 
         Line *lines_filtered = filter_lines(lines, filter_today_lines, NULL);
 
         if (lines_filtered != NULL) {
-            printf("[ID:%ld] %s\n", file->id, file->filepath);
+            printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
 
             printf("\n");
             display_today_lines_and_free(lines_filtered, "    ");
 
-            if (file->next != NULL) {
+            if (i < global_database.length - 1) {
                 printf("\n");
             }
         }
 
-
         free_lines(lines);
         free(content);
-    }
+    } database_foreach_end;
 
     printf("\n");
 
-    free_database(&database);
+    database_free(&global_database);
 
     return 0;
 }
 
 static int list_action(void) {
-    Database database = load_database();
+    show_current_selected_file(&global_database);
 
-    show_current_selected_file(&database);
+    database_foreach_begin(global_database) {
+        printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
+    } database_foreach_end;
 
-    for (DbFile *file = database.files_head; file != NULL; file = file->next)
-        printf("[ID:%ld] %s\n", file->id, file->filepath);
-
-    free_database(&database);
+    database_free(&global_database);
 
     return 0;
 }
@@ -1429,15 +1174,13 @@ static int filter_action(const char *program_name, const char *filter) {
 
     memcpy(filter_value, filter + filter_key_size + 1, filter_value_size);
 
-    Database database = load_database();
-
-    if (database.files_count == 0) {
+    if (global_database.length == 0) {
         printf("There is no file yet\n");
 
         return 0;
     }
 
-    show_current_selected_file(&database);
+    show_current_selected_file(&global_database);
 
     Filters filters = {0};
 
@@ -1485,10 +1228,11 @@ static int filter_action(const char *program_name, const char *filter) {
         }
     }
 
-    for (DbFile *file = database.files_head; file != NULL; file = file->next) {
+    /* for (DbFile *file = database.files_head; file != NULL; file = file->next) { */
+    database_foreach_begin(global_database) {
         char *content;
 
-        size_t content_size = read_file(file->filepath, &content);
+        size_t content_size = read_file(it->filepath, &content);
 
         Line *lines = compile_file(content, content_size);
 
@@ -1509,28 +1253,33 @@ static int filter_action(const char *program_name, const char *filter) {
         }
 
         if (lines != NULL) {
-            printf("[ID:%ld] %s\n", file->id, file->filepath);
+            // TODO: create a FMT macro to the id part
+            printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
 
             printf("\n");
             display_lines_and_free(lines, "    ");
 
-            if (file->next != NULL) {
+            if (i < global_database.length - 1) {
                 printf("\n");
             }
         }
 
         free(content);
-    }
+        free_lines(lines);
+    } database_foreach_end;
 
     printf("\n");
-    free_database(&database);
+    database_free(&global_database);
 
     return 0;
 }
 
 static int select_action(const char *program_name, const char *file_identifier) {
-    Database database = load_database();
-    DbFile *file;
+    (void)program_name;
+    (void)file_identifier;
+    // TODO: use conf.h to select
+    return 0;
+    /* DbFile *file;
 
     if (is_number(file_identifier)) {
         size_t id = strtoul(file_identifier, NULL, 10);
@@ -1570,44 +1319,28 @@ static int select_action(const char *program_name, const char *file_identifier) 
 
     free_database(&database);
 
-    return 0;
+    return 0; */
 }
 
 // `file_identifier` can be an Id or the path to the file
 static int get_action(const char *program_name, const char *file_identifier) {
-    Database database = load_database();
-
-    DbFile *file = NULL;
-
-    if (file_identifier == NULL) {
+    // TODO: use conf.h to get the selected file
+    /* if (file_identifier == NULL) {
         file = database.selected_file;
-    } else if (is_number(file_identifier)) {
-        size_t id = strtoul(file_identifier, NULL, 10);
+    } else  */
+    Database_Db_File *file = NULL;
+    database_status_code_t status_code = DATABASE_OK_STATUS_CODE;
 
-        file = get_database_file_by_id(&database, id);
-
-        if (file == NULL) {
-            fprintf(stderr, "\033[1;31merror:\033[0m there is no file with id %s in the database\n", file_identifier);
-
-            free_database(&database);
-            return 1;
-        }
-    } else {
-        char *abs_path = realpath(file_identifier, NULL);
-
-        if (abs_path == NULL) {
-            fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
-
-            return 1;
-        }   
-
-        if ((file = get_database_file_by_filepath(&database, abs_path)) == NULL) {
+    if ((status_code = database_get_file_by_identifier(&file, &global_database, file_identifier)) != DATABASE_OK_STATUS_CODE) {
+        if (status_code == DATABASE_NOT_FOUND_STATUS_CODE) {
             fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", file_identifier);
             fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, file_identifier);
-
-            free_database(&database);
-            return 1;
+        } else {
+            fprintf(stderr, "\033[1;31merror:\033[0m could not get \"%s\" due to: %s\n", file_identifier, database_status_code_string(status_code));
         }
+
+        database_free(&global_database);
+        return 1;
     }
  
     char *content;
@@ -1618,7 +1351,8 @@ static int get_action(const char *program_name, const char *file_identifier) {
 
     display_lines_and_free(lines, "");
 
-    free_database(&database);
+    database_free(&global_database);
+    free_lines(lines);
     free(content);
 
     return 0;
@@ -1635,40 +1369,25 @@ static void open_vim_at(const char *filepath) {
 }
 
 static int open_action(const char *program_name, const char *file_identifier) {
-    DbFile *file = NULL;
+    Database_Db_File *file = NULL;
+    database_status_code_t status_code = DATABASE_OK_STATUS_CODE;
 
-    Database database = load_database();
-
-    if (file_identifier == NULL) {
+    // TODO: use conf.h to get selected file
+    /* if (file_identifier == NULL) {
         file = database.selected_file;
-    } else if (is_number(file_identifier)) {
-        size_t id = strtoul(file_identifier, NULL, 10);
+    } else */
 
-        file = get_database_file_by_id(&database, id);
-
-        if (file == NULL) {
-            fprintf(stderr, "\033[1;31merror:\033[0m there is no file with id %s in the database\n", file_identifier);
-
-            free_database(&database);
-            return 1;
-        }
-    } else {
-        char *abs_path = realpath(file_identifier, NULL);
-
-        if (abs_path == NULL) {
-            fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
-
-            free_database(&database);
-            return 1;
-        }
-
-        if ((file = get_database_file_by_filepath(&database, abs_path)) == NULL) {
+    if ((status_code = database_get_file_by_identifier(&file, &global_database, file_identifier)) != DATABASE_OK_STATUS_CODE) {
+        if (status_code == DATABASE_NOT_FOUND_STATUS_CODE) {
             fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", file_identifier);
             fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, file_identifier);
-
-            free_database(&database);
-            return 1;
+        } else {
+            fprintf(stderr, "\033[1;31merror:\033[0m could not open \"%s\" due to: %s\n", file_identifier, database_status_code_string(status_code));
         }
+
+        database_free(&global_database);
+
+        return 1;
     }
 
     open_vim_at(file->filepath);
@@ -1677,6 +1396,10 @@ static int open_action(const char *program_name, const char *file_identifier) {
 }
 
 int main(int argc, char **argv) {
+    database_status_code_t status_code = database_load(&global_database);
+
+    if (status_code != DATABASE_OK_STATUS_CODE) return status_code;
+
     today_date = get_today_date();
     today_date_timestamp = get_timestamp(today_date);
 
@@ -1686,10 +1409,7 @@ int main(int argc, char **argv) {
 
     char *arg;
 
-    // TODO: do not load database twice
-    Database database = load_database();
-
-    bool does_have_selected_file = database.current_selected_file_id != 0;
+    bool does_have_selected_file = false; // database.current_selected_file_id != 0; // TODO: use conf.h to get selected file
 
     while ((arg = shift(&argc, &argv)) != NULL) {
         if (arg_cmp(arg, "help", "h")) {
@@ -1697,18 +1417,27 @@ int main(int argc, char **argv) {
 
             return 0;
         } else if (arg_cmp(arg, "add", "a")) {
-            const char *value = shift(&argc, &argv);
+            char *arg1 = shift(&argc, &argv);
 
-            if (value == NULL) {
-                usage(stderr, program_name, "option \"%s\" expects a filename", arg);
+            if (arg1 == NULL) {
+                usage(stderr, program_name, "option \"%s\" expects a name and a filename", arg);
+
+                return 1;
+            }
+
+            char *arg2 = shift(&argc, &argv);
+
+            if (arg2 == NULL) {
+                usage(stderr, program_name, "option \"%s\" expects a name and a filename", arg);
 
                 return 1;
             }
 
             args.kind = AK_ADD;
-            args.value = value;
+            args.arg1 = arg1;
+            args.arg2 = arg2;
         } else if (arg_cmp(arg, "remove", "r")) {
-            const char *value = shift(&argc, &argv);
+            char *value = shift(&argc, &argv);
 
             if (value == NULL && !does_have_selected_file) {
                 usage(stderr, program_name, "option \"%s\" expects a filename or id. you don't have any selected files", arg);
@@ -1717,11 +1446,11 @@ int main(int argc, char **argv) {
             }
 
             args.kind = AK_REMOVE;
-            args.value = value;
+            args.arg1 = value;
         } else if (arg_cmp(arg, "view", "v")) {
             args.kind = AK_VIEW;
         } else if (arg_cmp(arg, "get", "g")) {
-            const char *value = shift(&argc, &argv);
+            char *value = shift(&argc, &argv);
 
             if (value == NULL && !does_have_selected_file) {
                 usage(stderr, program_name, "the option \"%s\" expects a filename or id. you don't have any selected files", arg);
@@ -1730,9 +1459,9 @@ int main(int argc, char **argv) {
             }
 
             args.kind = AK_GET;
-            args.value = value;
+            args.arg1 = value;
         } else if (arg_cmp(arg, "open", "o")) {
-            const char *value = shift(&argc, &argv);
+            char *value = shift(&argc, &argv);
 
             if (value == NULL && !does_have_selected_file) {
                 usage(stderr, program_name, "the option \"%s\" expects a filename or id. you don't have any selected file", arg);
@@ -1741,13 +1470,13 @@ int main(int argc, char **argv) {
             }
 
             args.kind = AK_OPEN;
-            args.value = value;
+            args.arg1 = value;
         } else if (arg_cmp(arg, "today", "t")) {
             args.kind = AK_TODAY;
         } else if (arg_cmp(arg, "list", "l")) {
             args.kind = AK_LIST;
         } else if (arg_cmp(arg, "filter", "f")) {
-            const char *value = shift(&argc, &argv);
+            char *value = shift(&argc, &argv);
 
             if (value == NULL) {
                 usage(stderr, program_name, "the option \"%s\" expects a filter", arg);
@@ -1756,9 +1485,9 @@ int main(int argc, char **argv) {
             }
 
             args.kind = AK_FILTER;
-            args.value = value;
+            args.arg1 = value;
         } else if (arg_cmp(arg, "select", "s")) {
-            const char *value = shift(&argc, &argv);
+            char *value = shift(&argc, &argv);
 
             if (value == NULL) {
                 usage(stderr, program_name, "the option \"%s\" expects a filename or id", arg);
@@ -1767,7 +1496,7 @@ int main(int argc, char **argv) {
             }
 
             args.kind = AK_SELECT;
-            args.value = value;
+            args.arg1 = value;
         } else {
             if (*arg == '-') {
                 usage(stderr, program_name, "flag %s does not exists", arg);
@@ -1779,22 +1508,23 @@ int main(int argc, char **argv) {
         }
     }
 
-    free_database(&database);
 
     switch (args.kind) {
-        case AK_ADD: return add_action(args.value);
-        case AK_REMOVE: return remove_action(args.value);
+        case AK_ADD: return add_action(args.arg1, args.arg2);
+        case AK_REMOVE: return remove_action(args.arg1);
         case AK_VIEW: return view_action();
-        case AK_GET: return get_action(program_name, args.value);
-        case AK_OPEN: return open_action(program_name, args.value);
+        case AK_GET: return get_action(program_name, args.arg1);
+        case AK_OPEN: return open_action(program_name, args.arg1);
         case AK_TODAY: return today_action();
         case AK_LIST: return list_action();
-        case AK_FILTER: return filter_action(program_name, args.value);
-        case AK_SELECT: return select_action(program_name, args.value);
+        case AK_FILTER: return filter_action(program_name, args.arg1);
+        case AK_SELECT: return select_action(program_name, args.arg1);
         default:
             usage(stderr, program_name, NULL);
             return 1;
     }
+
+    database_free(&global_database);
 
     return 0;
 }
