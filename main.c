@@ -76,7 +76,7 @@ static size_t read_file(const char *filename, char **content) {
     const size_t stream_size = ftell(fptr);
     rewind(fptr);
 
-    if (*content != NULL) {
+    if (content != NULL) {
         *content = malloc((stream_size + 1) * sizeof(char));
 
         if (*content == NULL) {
@@ -917,11 +917,11 @@ static void usage(FILE *stream, const char *program_name, char *error_message, .
 
     fprintf(stream, "%s [option] [arguments]\n", program_name);
     fprintf(stream, "\n");
-    fprintf(stream, "    add     a    [filename] [title]                       add a new file to the tracking system\n");
-    fprintf(stream, "    remove  r    [filename|id] or nothing if selected     remove a file from the tracking system\n");
-    fprintf(stream, "    get     g    [filename|id] or nothing if selected     get specific file by path or id\n");
-    fprintf(stream, "    open    o    [filename|id] or nothing if selected     open a file using vim by path or id\n");
-    fprintf(stream, "    select  s    [filename|id]                            set file as selected so you can use it easier\n");
+    fprintf(stream, "    add     a    [title] [filename]                       add a new file to the tracking system\n");
+    fprintf(stream, "    remove  r    [id] or nothing if selected              remove a file from the tracking system\n");
+    fprintf(stream, "    get     g    [id] or nothing if selected              get specific file by path or id\n");
+    fprintf(stream, "    open    o    [id] or nothing if selected              open a file using vim by path or id\n");
+    fprintf(stream, "    select  s    [id]                                     set file as selected so you can use it easier\n");
     fprintf(stream, "    view    v                                             view files\n");
     fprintf(stream, "    list    l                                             list files\n");
     fprintf(stream, "    today   t                                             view today tasks\n");
@@ -962,20 +962,22 @@ static int add_action(char *name, char *filepath) {
         return 1;
     }
 
-    Database_Db_File file = {
-        .deleted = false,
-        .filepath = abs_path,
-        .name = name,
-    };
+    Database_Db_File *file = malloc(sizeof(Database_Db_File));
+    file->deleted = false;
+    file->filepath = malloc(strlen(abs_path));
+    file->name = malloc(strlen(name));
 
-    unsigned char *hash = hash_bytes(filepath, strlen(filepath));
+    memcpy(file->filepath, abs_path, strlen(abs_path));
+    memcpy(file->name, name, strlen(name));
 
-    memcpy(file.large_identifier, hash, LARGE_IDENTIFIER_SIZE);
-    memcpy(file.short_identifier, hash, SHORT_IDENTIFIER_SIZE);
+    unsigned char *hash = hash_bytes(abs_path, strlen(abs_path));
+
+    memcpy(file->large_identifier, hash, LARGE_IDENTIFIER_SIZE);
+    memcpy(file->short_identifier, hash, SHORT_IDENTIFIER_SIZE);
 
     free(hash);
 
-    database_status_code_t status_code = database_add_file(&global_database, &file);
+    database_status_code_t status_code = database_add_file(&global_database, file);
     
     if (status_code != DATABASE_OK_STATUS_CODE) {
         database_free(&global_database);
@@ -984,7 +986,7 @@ static int add_action(char *name, char *filepath) {
         return status_code;
     }
 
-    char *content;
+    char *content = NULL;
 
     size_t content_size = read_file(abs_path, &content);
 
@@ -993,7 +995,6 @@ static int add_action(char *name, char *filepath) {
     free(content);
     database_save(&global_database);
     database_free(&global_database);
-    free(abs_path);
 
     return 0;
 }

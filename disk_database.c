@@ -9,8 +9,6 @@
 
 #define DEFAULT_ARRAY_CAPACITY 50
 
-static const uint32_t max_filename_size = 254;
-static const uint32_t db_filepath_max_buffer = (max_filename_size + max_filename_size + max_filename_size + max_filename_size); // /<home>/<user>/wodo-folder/db
 static const char *db_folder_name = ".wodo";
 static const char *db_filename = ".wodo.db";
 
@@ -28,16 +26,18 @@ static const char *db_filename = ".wodo.db";
 static const char *get_database_filepath(void) {
     const char *user_home_folder = get_user_home_folder();
 
-    char *database_filepath = malloc(db_filepath_max_buffer * sizeof(char));
+    char *database_filepath = malloc(strlen(user_home_folder) + strlen(db_folder_name) + strlen(db_filename) + 4);
 
-    snprintf(database_filepath, sizeof(database_filepath), "%s/%s", user_home_folder, db_folder_name);
+    snprintf(database_filepath, strlen(user_home_folder) + strlen(db_folder_name) + 2, "%s/%s", user_home_folder, db_folder_name);
 
     if (!file_exists(database_filepath, true)) {
-        // TODO: handle errors properly
-        mkdir(database_filepath, 0777);
+        if (mkdir(database_filepath, 0777) != 0) {
+            fprintf(stderr, "error: could not created folder %s due to: %s\n", database_filepath, strerror(errno));
+            exit(1);
+        }
     }
 
-    snprintf(database_filepath, sizeof(database_filepath), "%s/%s/%s", user_home_folder, db_folder_name, db_filename);
+    snprintf(database_filepath, strlen(user_home_folder) + strlen(db_folder_name) + strlen(db_filename) + 3, "%s/%s/%s", user_home_folder, db_folder_name, db_filename);
 
     return database_filepath;
 }
@@ -57,7 +57,7 @@ database_status_code_t database_load(Database *out) {
 
     Database database = {0};
 
-    if (!file_exists(database_filepath, !false)) {
+    if (!file_exists(database_filepath, false)) {
         *out = database;
 
         return DATABASE_OK_STATUS_CODE;
@@ -77,7 +77,7 @@ database_status_code_t database_load(Database *out) {
     database.capacity = database.length;
 
     for (uint64_t i = 0; i < database.length; ++i) {
-        Database_Db_File *db_file = calloc(1, sizeof(Database_Db_File));
+        Database_Db_File *db_file = malloc(sizeof(Database_Db_File));
 
         db_file->deleted = false;
 
@@ -95,8 +95,11 @@ database_status_code_t database_load(Database *out) {
             return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
         }
 
+        db_file->name = malloc(name_size);
+
         if (fread(db_file->name, sizeof(char), name_size, file) != name_size) {
             fclose(file);
+            free(db_file->name);
             free(db_file);
             return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
         }
@@ -115,8 +118,11 @@ database_status_code_t database_load(Database *out) {
             return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
         }
 
+        db_file->filepath = malloc(filepath_size);
+
         if (fread(db_file->filepath, sizeof(char), filepath_size, file) != filepath_size) {
             fclose(file);
+            free(db_file->filepath);
             free(db_file);
             return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
         }

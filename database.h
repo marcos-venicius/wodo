@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-#define database_foreach_begin(database) { uint64_t i = 0; while (i++ < (database).length) { Database_Db_File *it = (database).data[i];
+#define database_foreach_begin(database) { uint64_t i = 0; while (i < (database).length) { Database_Db_File *it = (database).data[i++];
 #define database_foreach_end }}
 
 #define LARGE_IDENTIFIER_SIZE 40
