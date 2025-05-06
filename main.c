@@ -962,13 +962,19 @@ static int add_action(char *name, char *filepath) {
         return 1;
     }
 
+    size_t abs_path_size = strlen(abs_path);
+    size_t name_size = strlen(name);
+
     Database_Db_File *file = malloc(sizeof(Database_Db_File));
     file->deleted = false;
-    file->filepath = malloc(strlen(abs_path));
-    file->name = malloc(strlen(name));
+    file->filepath = malloc(abs_path_size + 1);
+    file->name = malloc(name_size + 1);
 
     memcpy(file->filepath, abs_path, strlen(abs_path));
     memcpy(file->name, name, strlen(name));
+
+    file->filepath[abs_path_size] = '\0';
+    file->name[name_size] = '\0';
 
     unsigned char *hash = hash_bytes(abs_path, strlen(abs_path));
 

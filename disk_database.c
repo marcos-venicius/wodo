@@ -229,7 +229,7 @@ database_status_code_t database_add_file(Database *database, Database_Db_File *f
     database_foreach_begin(*database) {
         if (it->deleted) continue;
 
-        if (strncmp((char*)file->short_identifier, (char*)it->short_identifier, SHORT_IDENTIFIER_SIZE)) {
+        if (strncmp((char*)file->short_identifier, (char*)it->short_identifier, SHORT_IDENTIFIER_SIZE) == 0) {
             return DATABASE_CONFLICT_STATUS_CODE;
         }
     } database_foreach_end;
