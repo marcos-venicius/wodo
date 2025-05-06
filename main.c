@@ -921,7 +921,7 @@ static void usage(FILE *stream, const char *program_name, char *error_message, .
     fprintf(stream, "    remove  r    [id] or nothing if selected              remove a file from the tracking system\n");
     fprintf(stream, "    get     g    [id] or nothing if selected              get specific file by path or id\n");
     fprintf(stream, "    open    o    [id] or nothing if selected              open a file using vim by path or id\n");
-    fprintf(stream, "    select  s    [id]                                     set file as selected so you can use it easier\n");
+    fprintf(stream, "    select  s    [id]                                     set file as selected so you can use it easier *work in progress\n");
     fprintf(stream, "    view    v                                             view files\n");
     fprintf(stream, "    list    l                                             list files\n");
     fprintf(stream, "    today   t                                             view today tasks\n");
