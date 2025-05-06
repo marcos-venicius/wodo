@@ -182,7 +182,14 @@ void database_save(Database *database) {
         exit(1);
     }
 
-    fwrite(&database->length, sizeof(uint64_t), 1, file);
+    uint64_t actual_db_size = 0;
+
+    database_foreach_begin(*database) {
+        if (it->deleted) continue;
+        actual_db_size++;
+    } database_foreach_end;
+
+    fwrite(&actual_db_size, sizeof(uint64_t), 1, file);
 
     database_foreach_begin(*database) {
         if (it->deleted) continue;
