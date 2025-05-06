@@ -1270,6 +1270,7 @@ static int filter_action(const char *program_name, const char *filter) {
 }
 
 static int select_action(const char *program_name, const char *file_identifier) {
+    printf("WIP: this feature will be done soon\n");
     (void)program_name;
     (void)file_identifier;
     // TODO: use conf.h to select
