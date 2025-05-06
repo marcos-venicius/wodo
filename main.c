@@ -1056,18 +1056,12 @@ static int view_action(void) {
 
         Line *lines = compile_file(content, content_size);
 
-        printf("\n");
         display_lines_and_free(lines, "    ");
 
-         if (i < global_database->length - 1) {
-            printf("\n");
-        }
+        printf("\n");
 
         free(content);
-        free_lines(lines);
    } database_foreach_end;
-
-    printf("\n");
 
     database_free(global_database);
 
@@ -1262,19 +1256,14 @@ static int filter_action(const char *program_name, const char *filter) {
             // TODO: create a FMT macro to the id part
             printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
 
-            printf("\n");
             display_lines_and_free(lines, "    ");
 
-            if (i < global_database->length - 1) {
-                printf("\n");
-            }
+            printf("\n");
         }
 
         free(content);
-        free_lines(lines);
     } database_foreach_end;
 
-    printf("\n");
     database_free(global_database);
 
     return 0;
@@ -1358,7 +1347,6 @@ static int get_action(const char *program_name, const char *file_identifier) {
     display_lines_and_free(lines, "");
 
     database_free(global_database);
-    free_lines(lines);
     free(content);
 
     return 0;
@@ -1449,7 +1437,7 @@ int main(int argc, char **argv) {
             char *value = shift(&argc, &argv);
 
             if (value == NULL && !does_have_selected_file) {
-                usage(stderr, program_name, "option \"%s\" expects a filename or id. you don't have any selected files", arg);
+                usage(stderr, program_name, "option \"%s\" expects an id. you don't have any selected files", arg);
 
                 return 1;
             }
@@ -1462,7 +1450,7 @@ int main(int argc, char **argv) {
             char *value = shift(&argc, &argv);
 
             if (value == NULL && !does_have_selected_file) {
-                usage(stderr, program_name, "the option \"%s\" expects a filename or id. you don't have any selected files", arg);
+                usage(stderr, program_name, "the option \"%s\" expects an id. you don't have any selected files", arg);
 
                 return 1;
             }
@@ -1473,7 +1461,7 @@ int main(int argc, char **argv) {
             char *value = shift(&argc, &argv);
 
             if (value == NULL && !does_have_selected_file) {
-                usage(stderr, program_name, "the option \"%s\" expects a filename or id. you don't have any selected file", arg);
+                usage(stderr, program_name, "the option \"%s\" expects an id. you don't have any selected file", arg);
 
                 return 1;
             }
@@ -1499,7 +1487,7 @@ int main(int argc, char **argv) {
             char *value = shift(&argc, &argv);
 
             if (value == NULL) {
-                usage(stderr, program_name, "the option \"%s\" expects a filename or id", arg);
+                usage(stderr, program_name, "the option \"%s\" expects an id", arg);
 
                 return 1;
             }
