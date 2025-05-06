@@ -35,7 +35,7 @@ typedef struct {
 typedef uint8_t database_status_code_t;
 
 // TODO: maybe in the future, do not load the entire database in memory
-database_status_code_t database_load(Database *out);
+database_status_code_t database_load(Database **out);
 void database_save(Database *database);
 void database_free(Database *database);
 database_status_code_t database_get_file_by_identifier(Database_Db_File **out, const Database *database, const char identifier[40]);

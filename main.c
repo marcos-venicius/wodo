@@ -19,7 +19,7 @@
 #define DB_FILEPATH_MAX_BUFFER (MAX_FILENAME_SIZE + MAX_FILENAME_SIZE + MAX_FILENAME_SIZE) // /<home>/<user>/file
 
 // initialized in `main`
-static Database global_database;
+static Database *global_database;
 
 // ---------------------------------------- Utils Start ----------------------------------------
 
@@ -977,11 +977,11 @@ static int add_action(char *name, char *filepath) {
 
     free(hash);
 
-    database_status_code_t status_code = database_add_file(&global_database, file);
+    database_status_code_t status_code = database_add_file(global_database, file);
     
     if (status_code != DATABASE_OK_STATUS_CODE) {
-        database_free(&global_database);
         fprintf(stderr, "\033[1;31merror:\033[0m could not add file due to: %s\n", database_status_code_string(status_code));
+        database_free(global_database);
 
         return status_code;
     }
@@ -993,8 +993,8 @@ static int add_action(char *name, char *filepath) {
     free_lines(compile_file(content, content_size));
 
     free(content);
-    database_save(&global_database);
-    database_free(&global_database);
+    database_save(global_database);
+    database_free(global_database);
 
     return 0;
 }
@@ -1010,16 +1010,16 @@ static int remove_action(const char file_identifier[40]) {
 
     Database_Db_File *file = NULL;
 
-    status_code = database_get_file_by_identifier(&file, &global_database, file_identifier);
+    status_code = database_get_file_by_identifier(&file, global_database, file_identifier);
 
     if (status_code == DATABASE_NOT_FOUND_STATUS_CODE) {
-        database_free(&global_database);
+        database_free(global_database);
 
         return 0;
     }
 
     if (status_code != DATABASE_OK_STATUS_CODE) {
-        database_free(&global_database);
+        database_free(global_database);
 
         return status_code;
     }
@@ -1028,20 +1028,20 @@ static int remove_action(const char file_identifier[40]) {
 
     database_delete_file(file);
 
-    database_save(&global_database);
-    database_free(&global_database);
+    database_save(global_database);
+    database_free(global_database);
 
     return 0;
 }
 
 static int view_action(void) {
-    if (global_database.length == 0) {
+    if (global_database->length == 0) {
         return 0;
     }
 
-    show_current_selected_file(&global_database);
+    show_current_selected_file(global_database);
 
-    database_foreach_begin(global_database) {
+    database_foreach_begin(*global_database) {
         printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
 
         char *content;
@@ -1053,7 +1053,7 @@ static int view_action(void) {
         printf("\n");
         display_lines_and_free(lines, "    ");
 
-         if (i < global_database.length - 1) {
+         if (i < global_database->length - 1) {
             printf("\n");
         }
 
@@ -1063,15 +1063,15 @@ static int view_action(void) {
 
     printf("\n");
 
-    database_free(&global_database);
+    database_free(global_database);
 
     return 0;
 }
 
 static int today_action(void) {
-    show_current_selected_file(&global_database);
+    show_current_selected_file(global_database);
 
-    database_foreach_begin(global_database) {
+    database_foreach_begin(*global_database) {
         char *content;
 
         size_t content_size = read_file(it->filepath, &content);
@@ -1086,7 +1086,7 @@ static int today_action(void) {
             printf("\n");
             display_today_lines_and_free(lines_filtered, "    ");
 
-            if (i < global_database.length - 1) {
+            if (i < global_database->length - 1) {
                 printf("\n");
             }
         }
@@ -1097,19 +1097,19 @@ static int today_action(void) {
 
     printf("\n");
 
-    database_free(&global_database);
+    database_free(global_database);
 
     return 0;
 }
 
 static int list_action(void) {
-    show_current_selected_file(&global_database);
+    show_current_selected_file(global_database);
 
-    database_foreach_begin(global_database) {
+    database_foreach_begin(*global_database) {
         printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
     } database_foreach_end;
 
-    database_free(&global_database);
+    database_free(global_database);
 
     return 0;
 }
@@ -1175,13 +1175,13 @@ static int filter_action(const char *program_name, const char *filter) {
 
     memcpy(filter_value, filter + filter_key_size + 1, filter_value_size);
 
-    if (global_database.length == 0) {
+    if (global_database->length == 0) {
         printf("There is no file yet\n");
 
         return 0;
     }
 
-    show_current_selected_file(&global_database);
+    show_current_selected_file(global_database);
 
     Filters filters = {0};
 
@@ -1229,8 +1229,7 @@ static int filter_action(const char *program_name, const char *filter) {
         }
     }
 
-    /* for (DbFile *file = database.files_head; file != NULL; file = file->next) { */
-    database_foreach_begin(global_database) {
+    database_foreach_begin(*global_database) {
         char *content;
 
         size_t content_size = read_file(it->filepath, &content);
@@ -1260,7 +1259,7 @@ static int filter_action(const char *program_name, const char *filter) {
             printf("\n");
             display_lines_and_free(lines, "    ");
 
-            if (i < global_database.length - 1) {
+            if (i < global_database->length - 1) {
                 printf("\n");
             }
         }
@@ -1270,7 +1269,7 @@ static int filter_action(const char *program_name, const char *filter) {
     } database_foreach_end;
 
     printf("\n");
-    database_free(&global_database);
+    database_free(global_database);
 
     return 0;
 }
@@ -1332,7 +1331,7 @@ static int get_action(const char *program_name, const char *file_identifier) {
     Database_Db_File *file = NULL;
     database_status_code_t status_code = DATABASE_OK_STATUS_CODE;
 
-    if ((status_code = database_get_file_by_identifier(&file, &global_database, file_identifier)) != DATABASE_OK_STATUS_CODE) {
+    if ((status_code = database_get_file_by_identifier(&file, global_database, file_identifier)) != DATABASE_OK_STATUS_CODE) {
         if (status_code == DATABASE_NOT_FOUND_STATUS_CODE) {
             fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", file_identifier);
             fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, file_identifier);
@@ -1340,7 +1339,7 @@ static int get_action(const char *program_name, const char *file_identifier) {
             fprintf(stderr, "\033[1;31merror:\033[0m could not get \"%s\" due to: %s\n", file_identifier, database_status_code_string(status_code));
         }
 
-        database_free(&global_database);
+        database_free(global_database);
         return 1;
     }
  
@@ -1352,7 +1351,7 @@ static int get_action(const char *program_name, const char *file_identifier) {
 
     display_lines_and_free(lines, "");
 
-    database_free(&global_database);
+    database_free(global_database);
     free_lines(lines);
     free(content);
 
@@ -1378,7 +1377,7 @@ static int open_action(const char *program_name, const char *file_identifier) {
         file = database.selected_file;
     } else */
 
-    if ((status_code = database_get_file_by_identifier(&file, &global_database, file_identifier)) != DATABASE_OK_STATUS_CODE) {
+    if ((status_code = database_get_file_by_identifier(&file, global_database, file_identifier)) != DATABASE_OK_STATUS_CODE) {
         if (status_code == DATABASE_NOT_FOUND_STATUS_CODE) {
             fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", file_identifier);
             fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, file_identifier);
@@ -1386,7 +1385,7 @@ static int open_action(const char *program_name, const char *file_identifier) {
             fprintf(stderr, "\033[1;31merror:\033[0m could not open \"%s\" due to: %s\n", file_identifier, database_status_code_string(status_code));
         }
 
-        database_free(&global_database);
+        database_free(global_database);
 
         return 1;
     }
@@ -1399,7 +1398,10 @@ static int open_action(const char *program_name, const char *file_identifier) {
 int main(int argc, char **argv) {
     database_status_code_t status_code = database_load(&global_database);
 
-    if (status_code != DATABASE_OK_STATUS_CODE) return status_code;
+    if (status_code != DATABASE_OK_STATUS_CODE) {
+        fprintf(stderr, "error: could not open database due to: %s\n", database_status_code_string(status_code));
+        return status_code;
+    }
 
     today_date = get_today_date();
     today_date_timestamp = get_timestamp(today_date);
@@ -1525,7 +1527,7 @@ int main(int argc, char **argv) {
             return 1;
     }
 
-    database_free(&global_database);
+    database_free(global_database);
 
     return 0;
 }
