@@ -11,6 +11,7 @@
 #include <time.h>
 #include "./database.h"
 #include "crypt.h"
+#include "utils.h"
 
 #define DB_FILENAME ".wodo.db"
 #define CONFIG_FILENAME ".wodo.conf.db"
@@ -791,7 +792,7 @@ static void display_line(Line *line, char *padding, size_t max_string_size) {
         }
     }
 
-    int space = max_string_size - line->text_size - line->indent;
+    int space = max_string_size - chars_count(line->text, line->text_size) - line->indent;
     printf("%s%*.s", padding, line->indent, "");
     printf("%.*s    %*.s", (int)line->text_size, line->text, space, "");
 
