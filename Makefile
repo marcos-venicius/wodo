@@ -1,15 +1,29 @@
-CXX = gcc
-CXX_FLAGS = -Wall -Wextra -pedantic -ggdb
+CXX = clang
+CXX_FLAGS = -Wall -Wextra -pedantic -ggdb 
+OPENSSL_FLAGS = `pkg-config --libs --cflags openssl`
+BUILD_FLAGS =
 
 ifeq ($(BUILD), 1)
-	CXX_FLAGS = -O3 -march=native -flto -fPIE -pie -fno-semantic-interposition -fstack-protector-strong -Wall -Wextra -Wpedantic -fvisibility=hidden
+	BUILD_FLAGS = -O3 -march=native -flto -fPIE -pie -fno-semantic-interposition -fvisibility=hidden
 endif
 
-wodo: main.o
-	$(CXX) $(CXX_FLAGS) -o wodo main.o
+wodo: main.o conf.o database.o crypt.o utils.o
+	$(CXX) $(CXX_FLAGS) $(OPENSSL_FLAGS) $(BUILD_FLAGS) -o wodo $^
 
-main.o: main.c
+main.o: main.c utils.c utils.h crypt.c crypt.h database.h disk_database.c
 	$(CXX) $(CXX_FLAGS) -c main.c -o main.o
+
+conf.o: conf.c conf.h
+	$(CXX) $(CXX_FLAGS) -c conf.c -o conf.o
+
+database.o: disk_database.c database.h utils.c utils.h
+	$(CXX) $(CXX_FLAGS) -c disk_database.c -o database.o
+
+utils.o: utils.c utils.h
+	$(CXX) $(CXX_FLAGS) -c utils.c -o utils.o
+
+crypt.o: crypt.c crypt.h
+	$(CXX) $(CXX_FLAGS) -c crypt.c -o crypt.o
 
 clean:
 	rm -rf *.o wodo

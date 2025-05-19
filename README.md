@@ -8,13 +8,25 @@ Everytime you want to check all of your todos you can just do `wodo view`, this 
 
 To use it, you need to add some configurations to vim:
 
+**requires you to have openssl**
+
 ```vim
+function! AddTodoBoilerplate()
+    let l:date = strftime("%A %d-%m-%y %H:%M - %H:%M")
+
+    if getline('.') ==# ''
+        execute "normal! 0i\"\" " . l:date . " Todo\<Esc>0l"
+    else
+        execute "normal! o\"\" " . l:date . " Todo\<Esc>0l"
+    endif
+endfunction
+
 augroup TodoListFile
   autocmd!
-  autocmd BufRead,BufNewFile *.todo* nnoremap <leader>t <esc>$vF-da- Todo<esc>0f[lr 
-  autocmd BufRead,BufNewFile *.todo* nnoremap <leader>i <esc>$vF-da- Doing<esc>0f[lr 
-  autocmd BufRead,BufNewFile *.todo* nnoremap <leader>c <esc>$vF-da- Done<esc>0f[lrx<esc>j^f[l
-  autocmd BufRead,BufNewFile *.todo* nnoremap <leader>a <esc>0Di- [ ] <name> \| --day-- 00, 00:00 - 00:00 - Todo<esc>0fnh
+  autocmd BufRead,BufNewFile *.todo* nnoremap <leader>t <esc>$BDaTodo<esc>0l
+  autocmd BufRead,BufNewFile *.todo* nnoremap <leader>i <esc>$BDaDoing<esc>0l
+  autocmd BufRead,BufNewFile *.todo* nnoremap <leader>c <esc>$BDaDone<esc>0l
+  autocmd BufRead,BufNewFile *.todo* nnoremap <leader>a :call AddTodoBoilerplate()<cr>
 augroup END
 ```
 
@@ -35,8 +47,6 @@ After do this, everytime you update this file the wodo will be able to see this 
 
 Maybe I'll update this project to allow you to:
 
-- automatically open a todo file on your vim
-- display aligned tasks
 - allow modify tasks via cli
     - change state of a task
     - remove a task
@@ -47,5 +57,5 @@ Maybe I'll update this project to allow you to:
 
 and some other stuff.
 
-**And of course, I need to refactor this mess of almost 1000 lines main.c file**
+**And of course, I need to refactor this mess of almost _2000_ lines main.c file (now) :)**
 
