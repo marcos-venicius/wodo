@@ -198,7 +198,7 @@ static void save_token(Lexer *lexer, Token_Kind kind) {
     Token *token = malloc(sizeof(Token));
 
     token->value = lexer->content + lexer->bot;
-    token->value_size = lexer->cursor - lexer->bot; // TODO: FIXME: search how to handle utf-8 strings to allow portuguese accent marks
+    token->value_size = lexer->cursor - lexer->bot;
     token->kind = kind;
     token->next = NULL;
 
