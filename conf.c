@@ -237,17 +237,6 @@ const char *wodo_error_string(wodo_error_code_t code) {
     assert(0 && "TODO: missing update wodo_error_string");
 }
 
-Wodo_Config_Key wodo_config_key_from_cstr(const char *string) {
-    return wodo_config_value_from_cstr(string);
-}
-
-Wodo_Config_Value wodo_config_value_from_cstr(const char *string) {
-    return (Wodo_Config_Value){
-        .value = string,
-        .size = strlen(string)
-    };
-}
-
 void wodo_setup_config_file_location(const char *filepath) {
     config_filepath = filepath;
 }

@@ -12,6 +12,9 @@
 #define WODO_INVALID_ROW_VERSION_ERROR_CODE 5
 #define WODO_KEY_NOT_FOUND_ERROR_CODE 6
 
+#define wodo_config_key_from_cstr(string) (Wodo_Config_Key){ .value = string, .size = strlen(string) }
+#define wodo_config_value_from_cstr(string) (Wodo_Config_Value){ .value = string, .size = strlen(string) }
+
 typedef struct {
     const char *value;
     uint64_t size;
@@ -22,8 +25,6 @@ typedef Wodo_Config_Key Wodo_Config_Value;
 
 const char *wodo_error_string(wodo_error_code_t code);
 
-Wodo_Config_Key wodo_config_key_from_cstr(const char *string);
-Wodo_Config_Value wodo_config_value_from_cstr(const char *string);
 void wodo_setup_config_file_location(const char *filepath);
 wodo_error_code_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_Value value);
 wodo_error_code_t wodo_remove_config(const Wodo_Config_Key key);

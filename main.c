@@ -10,17 +10,16 @@
 #include <sys/wait.h>
 #include <time.h>
 #include "./database.h"
-#include "crypt.h"
-#include "utils.h"
+#include "./crypt.h"
+#include "./utils.h"
+#include "./conf.h"
 
-#define DB_FILENAME ".wodo.db"
-#define CONFIG_FILENAME ".wodo.conf.db"
 #define MAX_FILENAME_SIZE 255
 #define MAX_FILTER_SIZE 10
-#define DB_FILEPATH_MAX_BUFFER (MAX_FILENAME_SIZE + MAX_FILENAME_SIZE + MAX_FILENAME_SIZE) // /<home>/<user>/file
 
 // initialized in `main`
 static Database *global_database;
+static Wodo_Config_Key selected_file_identifier_key = wodo_config_key_from_cstr("selected_file_identifier");
 
 // ---------------------------------------- Utils Start ----------------------------------------
 
@@ -988,7 +987,6 @@ static int add_action(char *name, char *filepath) {
     
     if (status_code != DATABASE_OK_STATUS_CODE) {
         fprintf(stderr, "\033[1;31merror:\033[0m could not add file due to: %s\n", database_status_code_string(status_code));
-        database_free(global_database);
 
         return status_code;
     }
@@ -1001,7 +999,6 @@ static int add_action(char *name, char *filepath) {
 
     free(content);
     database_save(global_database);
-    database_free(global_database);
 
     return 0;
 }
@@ -1020,14 +1017,10 @@ static int remove_action(const char file_identifier[40]) {
     status_code = database_get_file_by_identifier(&file, global_database, file_identifier);
 
     if (status_code == DATABASE_NOT_FOUND_STATUS_CODE) {
-        database_free(global_database);
-
         return 0;
     }
 
     if (status_code != DATABASE_OK_STATUS_CODE) {
-        database_free(global_database);
-
         return status_code;
     }
 
@@ -1036,7 +1029,6 @@ static int remove_action(const char file_identifier[40]) {
     database_delete_file(file);
 
     database_save(global_database);
-    database_free(global_database);
 
     return 0;
 }
@@ -1063,8 +1055,6 @@ static int view_action(void) {
 
         free(content);
    } database_foreach_end;
-
-    database_free(global_database);
 
     return 0;
 }
@@ -1098,8 +1088,6 @@ static int today_action(void) {
 
     printf("\n");
 
-    database_free(global_database);
-
     return 0;
 }
 
@@ -1109,8 +1097,6 @@ static int list_action(void) {
     database_foreach_begin(*global_database) {
         printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
     } database_foreach_end;
-
-    database_free(global_database);
 
     return 0;
 }
@@ -1265,58 +1251,29 @@ static int filter_action(const char *program_name, const char *filter) {
         free(content);
     } database_foreach_end;
 
-    database_free(global_database);
-
     return 0;
 }
 
-static int select_action(const char *program_name, const char *file_identifier) {
-    printf("WIP: this feature will be done soon\n");
-    (void)program_name;
-    (void)file_identifier;
-    // TODO: use conf.h to select
-    return 0;
-    /* DbFile *file;
+static int select_action(const char *file_identifier) {
+    Database_Db_File *out = NULL;
 
-    if (is_number(file_identifier)) {
-        size_t id = strtoul(file_identifier, NULL, 10);
+    database_status_code_t status_code = database_get_file_by_identifier(&out, global_database, file_identifier);
 
-        file = get_database_file_by_id(&database, id);
+    if (status_code != DATABASE_OK_STATUS_CODE) {
+        fprintf(stderr, "\033[1;31merror:\033[0m could not verify file \"%s\" in database due to: %s\n", file_identifier, database_status_code_string(status_code));
 
-        if (file == NULL) {
-            fprintf(stderr, "\033[1;31merror:\033[0m there is no file with id %s in the database\n", file_identifier);
-
-            free_database(&database);
-            return 1;
-        }
-    } else {
-        char *abs_path = realpath(file_identifier, NULL);
-
-        if (abs_path == NULL) {
-            fprintf(stderr, "\033[1;31merror:\033[0m invalid filename\n");
-
-            return 1;
-        }
-
-        file = get_database_file_by_filepath(&database, abs_path);
-
-        if (file == NULL) {
-            fprintf(stderr, "\033[1;31merror:\033[0m the file %s does not exists in the database\n", file_identifier);
-            fprintf(stderr, "use \"%s add %s\" to add this file in the database\n", program_name, file_identifier);
-
-            return 1;
-        }
+        return 1;
     }
 
-    database.current_selected_file_id = file->id;
+    wodo_error_code_t code = wodo_set_config(selected_file_identifier_key, wodo_config_value_from_cstr(file_identifier));
 
-    save_database(&database);
+    if (code != WODO_OK_CODE) {
+        fprintf(stderr, "\033[1;31merror:\033[0m could not select file \"%s\" due to: %s\n", file_identifier, wodo_error_string(code));
 
-    fprintf(stdout, "selected file changed successfully to \"%s\"\n", file->filepath);
+        return code;
+    }
 
-    free_database(&database);
-
-    return 0; */
+    return 0;
 }
 
 // `file_identifier` can be an Id or the path to the file
@@ -1335,8 +1292,6 @@ static int get_action(const char *program_name, const char *file_identifier) {
         } else {
             fprintf(stderr, "\033[1;31merror:\033[0m could not get \"%s\" due to: %s\n", file_identifier, database_status_code_string(status_code));
         }
-
-        database_free(global_database);
         return 1;
     }
  
@@ -1348,7 +1303,6 @@ static int get_action(const char *program_name, const char *file_identifier) {
 
     display_lines_and_free(lines, "");
 
-    database_free(global_database);
     free(content);
 
     return 0;
@@ -1381,8 +1335,6 @@ static int open_action(const char *program_name, const char *file_identifier) {
             fprintf(stderr, "\033[1;31merror:\033[0m could not open \"%s\" due to: %s\n", file_identifier, database_status_code_string(status_code));
         }
 
-        database_free(global_database);
-
         return 1;
     }
 
@@ -1391,7 +1343,16 @@ static int open_action(const char *program_name, const char *file_identifier) {
     return 0;
 }
 
+#define defer(code) return_code = code; goto end
+
 int main(int argc, char **argv) {
+    int return_code = 0;
+
+    const char *user_home_folder = get_user_home_folder();
+    char *config_file_location = join_paths("%s/%s", user_home_folder, ".wodo/.config");
+
+    wodo_setup_config_file_location(config_file_location);
+
     database_status_code_t status_code = database_load(&global_database);
 
     if (status_code != DATABASE_OK_STATUS_CODE) {
@@ -1408,20 +1369,24 @@ int main(int argc, char **argv) {
 
     char *arg;
 
-    bool does_have_selected_file = false; // database.current_selected_file_id != 0; // TODO: use conf.h to get selected file
+    Wodo_Config_Value *out = NULL;
+
+    status_code = wodo_get_config(wodo_config_key_from_cstr("selected_file_identifier"), out);
+
+    bool does_have_selected_file = status_code == DATABASE_OK_STATUS_CODE;
 
     while ((arg = shift(&argc, &argv)) != NULL) {
         if (arg_cmp(arg, "help", "h")) {
             usage(stdout, program_name, NULL);
 
-            return 0;
+            defer(0);
         } else if (arg_cmp(arg, "add", "a")) {
             char *arg1 = shift(&argc, &argv);
 
             if (arg1 == NULL) {
                 usage(stderr, program_name, "option \"%s\" expects a name and a filename", arg);
 
-                return 1;
+                defer(1);
             }
 
             char *arg2 = shift(&argc, &argv);
@@ -1429,7 +1394,7 @@ int main(int argc, char **argv) {
             if (arg2 == NULL) {
                 usage(stderr, program_name, "option \"%s\" expects a name and a filename", arg);
 
-                return 1;
+                defer(1);
             }
 
             args.kind = AK_ADD;
@@ -1441,7 +1406,7 @@ int main(int argc, char **argv) {
             if (value == NULL && !does_have_selected_file) {
                 usage(stderr, program_name, "option \"%s\" expects an id. you don't have any selected files", arg);
 
-                return 1;
+                defer(1);
             }
 
             args.kind = AK_REMOVE;
@@ -1454,7 +1419,7 @@ int main(int argc, char **argv) {
             if (value == NULL && !does_have_selected_file) {
                 usage(stderr, program_name, "the option \"%s\" expects an id. you don't have any selected files", arg);
 
-                return 1;
+                defer(1);
             }
 
             args.kind = AK_GET;
@@ -1465,7 +1430,7 @@ int main(int argc, char **argv) {
             if (value == NULL && !does_have_selected_file) {
                 usage(stderr, program_name, "the option \"%s\" expects an id. you don't have any selected file", arg);
 
-                return 1;
+                defer(1);
             }
 
             args.kind = AK_OPEN;
@@ -1480,7 +1445,7 @@ int main(int argc, char **argv) {
             if (value == NULL) {
                 usage(stderr, program_name, "the option \"%s\" expects a filter", arg);
 
-                return 1;
+                defer(1);
             }
 
             args.kind = AK_FILTER;
@@ -1491,7 +1456,7 @@ int main(int argc, char **argv) {
             if (value == NULL) {
                 usage(stderr, program_name, "the option \"%s\" expects an id", arg);
 
-                return 1;
+                defer(1);
             }
 
             args.kind = AK_SELECT;
@@ -1503,27 +1468,29 @@ int main(int argc, char **argv) {
                 usage(stderr, program_name, "option \"%s\" does not exists", arg);
             }
 
-            return 1;
+            defer(1);
         }
     }
 
-
     switch (args.kind) {
-        case AK_ADD: return add_action(args.arg1, args.arg2);
-        case AK_REMOVE: return remove_action(args.arg1);
-        case AK_VIEW: return view_action();
-        case AK_GET: return get_action(program_name, args.arg1);
-        case AK_OPEN: return open_action(program_name, args.arg1);
-        case AK_TODAY: return today_action();
-        case AK_LIST: return list_action();
-        case AK_FILTER: return filter_action(program_name, args.arg1);
-        case AK_SELECT: return select_action(program_name, args.arg1);
-        default:
+        case AK_ADD: return_code = add_action(args.arg1, args.arg2); break;
+        case AK_REMOVE: return_code = remove_action(args.arg1); break;
+        case AK_VIEW: return_code = view_action(); break;
+        case AK_GET: return_code = get_action(program_name, args.arg1); break;
+        case AK_OPEN: return_code = open_action(program_name, args.arg1); break;
+        case AK_TODAY: return_code = today_action(); break;
+        case AK_LIST: return_code = list_action(); break;
+        case AK_FILTER: return_code = filter_action(program_name, args.arg1); break;
+        case AK_SELECT: return_code = select_action(args.arg1); break;
+        default: {
             usage(stderr, program_name, NULL);
-            return 1;
+            return_code = 1;
+        } break;
     }
 
+end:
+    free(config_file_location);
     database_free(global_database);
 
-    return 0;
+    return return_code;
 }
