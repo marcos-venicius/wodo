@@ -1,16 +1,14 @@
 CXX = clang
 CXX_FLAGS = -Wall -Wextra -pedantic -ggdb 
 OPENSSL_FLAGS = `pkg-config --libs --cflags openssl`
+BUILD_FLAGS =
 
 ifeq ($(BUILD), 1)
-	CXX_FLAGS = -O3 -march=native -flto -fPIE -pie -fno-semantic-interposition -Wall -Wextra -Wpedantic -fvisibility=hidden
+	BUILD_FLAGS = -O3 -march=native -flto -fPIE -pie -fno-semantic-interposition -fvisibility=hidden
 endif
 
 wodo: main.o conf.o database.o crypt.o utils.o
-	$(CXX) $(CXX_FLAGS) $(OPENSSL_FLAGS) -o wodo $^
-
-test: conf.o test.o
-	$(CXX) $(CXX_FLAGS) -o test $^
+	$(CXX) $(CXX_FLAGS) $(OPENSSL_FLAGS) $(BUILD_FLAGS) -o wodo $^
 
 main.o: main.c utils.c utils.h crypt.c crypt.h database.h disk_database.c
 	$(CXX) $(CXX_FLAGS) -c main.c -o main.o
@@ -27,8 +25,5 @@ utils.o: utils.c utils.h
 crypt.o: crypt.c crypt.h
 	$(CXX) $(CXX_FLAGS) -c crypt.c -o crypt.o
 
-test.o: test-conf.c conf.h
-	$(CXX) $(CXX_FLAGS) -c test-conf.c -o test.o
-
 clean:
-	rm -rf *.o wodo test
+	rm -rf *.o wodo
