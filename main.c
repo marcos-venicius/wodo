@@ -119,7 +119,7 @@ static void show_current_selected_file(void) {
 
     database_get_file_by_identifier(&file, global_database, out->value);
 
-    fprintf(stdout, "current selected file: [ID:%s] %s\n\n", file->short_identifier, file->name);
+    fprintf(stdout, "current selected file: \033[1;33m%s\033[0m \"%s\"\n\n", file->short_identifier, file->name);
 }
 
 // ---------------------------------------- Utils End ----------------------------------------
@@ -1287,10 +1287,20 @@ static int select_action(const char *file_identifier) {
 
 // `file_identifier` can be an Id or the path to the file
 static int get_action(const char *program_name, const char *file_identifier) {
-    // TODO: use conf.h to get the selected file
-    /* if (file_identifier == NULL) {
-        file = database.selected_file;
-    } else  */
+    if (file_identifier == NULL) {
+        Wodo_Config_Value *out = NULL;
+
+        wodo_error_code_t code = wodo_get_config(selected_file_identifier_key, &out);
+
+        if (code != WODO_OK_CODE) {
+            fprintf(stderr, "\033[1;31merror:\033[0m could not open \"%s\" due to: %s\n", file_identifier, wodo_error_string(code));
+
+            return code;
+        }
+
+        file_identifier = out->value;
+    }
+
     Database_Db_File *file = NULL;
     database_status_code_t status_code = DATABASE_OK_STATUS_CODE;
 
