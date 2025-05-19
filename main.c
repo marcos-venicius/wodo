@@ -137,9 +137,15 @@ typedef enum {
 } ArgumentKind;
 
 typedef struct {
+    bool verbose;
+} Flags;
+
+typedef struct {
     ArgumentKind kind;
     char *arg1;
     char *arg2;
+
+    Flags flags;
 } Arguments;
 
 typedef enum {
@@ -924,7 +930,7 @@ static int display_today_lines_and_free(Line *lines, char *padding) {
 static void usage(FILE *stream, const char *program_name, char *error_message, ...) {
     va_list args;
 
-    fprintf(stream, "%s [option] [arguments]\n", program_name);
+    fprintf(stream, "%s [action] [arguments?] [flags?]\n", program_name);
     fprintf(stream, "\n");
     fprintf(stream, "    add     a    [title] [filename]                       add a new file to the tracking system\n");
     fprintf(stream, "    remove  r    [id] or nothing if selected              remove a file from the tracking system\n");
@@ -932,7 +938,9 @@ static void usage(FILE *stream, const char *program_name, char *error_message, .
     fprintf(stream, "    open    o    [id] or nothing if selected              open a file using vim by path or id\n");
     fprintf(stream, "    select  s    [id]                                     set file as selected so you can use it easier *work in progress\n");
     fprintf(stream, "    view    v                                             view files\n");
+    fprintf(stream, "                 --verbose -v                             display more information about the file\n");
     fprintf(stream, "    list    l                                             list files\n");
+    fprintf(stream, "                 --verbose -v                             display more information about the file\n");
     fprintf(stream, "    today   t                                             view today tasks\n");
     fprintf(stream, "    filter  f                                             filter tasks\n");
     fprintf(stream, "                 [ts=past|future|present]                 search for time state\n");
@@ -959,7 +967,14 @@ static char *shift(int *argc, char ***argv) {
 }
 
 static inline bool arg_cmp(const char *actual, const char *expected, const char *alternative) {
-    return strncmp(actual, expected, strlen(actual)) == 0 || strncmp(actual, alternative, strlen(actual)) == 0;
+    size_t actual_length = strlen(actual);
+    size_t expected_length = strlen(expected);
+    size_t alternative_length = strlen(alternative);
+
+    bool expected_result = cmp_sized_strings(actual, expected, actual_length, expected_length);
+    bool alternative_result = cmp_sized_strings(actual, alternative, actual_length, alternative_length);
+
+    return  expected_result || alternative_result;
 }
 
 static int add_action(char *name, char *filepath) {
@@ -1064,15 +1079,29 @@ static int remove_action(const char file_identifier[40]) {
     return 0;
 }
 
-static int view_action(void) {
+static int view_action(Flags flags) {
     if (global_database->length == 0) {
         return 0;
     }
 
     show_current_selected_file();
 
+    size_t max_filepath_size = 0;
+
     database_foreach_begin(*global_database) {
-        printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
+        size_t size = strlen(it->filepath);
+
+        if (size > max_filepath_size) {
+            max_filepath_size = size;
+        }
+    } database_foreach_end;
+
+    database_foreach_begin(*global_database) {
+        if (flags.verbose) {
+            printf("\033[1;33m%.*s\033[0m \033[0;35m%s\033[0m%*.s %s\n", LARGE_IDENTIFIER_SIZE, it->large_identifier, it->filepath, (int)(max_filepath_size - strlen(it->filepath)), "", it->name);
+        } else {
+            printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
+        }
 
         char *content;
 
@@ -1117,16 +1146,28 @@ static int today_action(void) {
         free(content);
     } database_foreach_end;
 
-    printf("\n");
-
     return 0;
 }
 
-static int list_action(void) {
+static int list_action(Flags flags) {
     show_current_selected_file();
 
+    size_t max_filepath_size = 0;
+
     database_foreach_begin(*global_database) {
-        printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
+        size_t size = strlen(it->filepath);
+
+        if (size > max_filepath_size) {
+            max_filepath_size = size;
+        }
+    } database_foreach_end;
+
+    database_foreach_begin(*global_database) {
+        if (flags.verbose) {
+            printf("\033[1;33m%.*s\033[0m \033[0;35m%s\033[0m%*.s %s\n", LARGE_IDENTIFIER_SIZE, it->large_identifier, it->filepath, (int)(max_filepath_size - strlen(it->filepath)), "", it->name);
+        } else {
+            printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
+        }
     } database_foreach_end;
 
     return 0;
@@ -1275,8 +1316,6 @@ static int filter_action(const char *program_name, const char *filter) {
             printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
 
             display_lines_and_free(lines, "    ");
-
-            printf("\n");
         }
 
         free(content);
@@ -1517,6 +1556,8 @@ int main(int argc, char **argv) {
 
             args.kind = AK_SELECT;
             args.arg1 = value;
+        } else if (arg_cmp(arg, "--verbose", "-v")) {
+            args.flags.verbose = true;
         } else {
             if (*arg == '-') {
                 usage(stderr, program_name, "flag %s does not exists", arg);
@@ -1531,11 +1572,11 @@ int main(int argc, char **argv) {
     switch (args.kind) {
         case AK_ADD: return_code = add_action(args.arg1, args.arg2); break;
         case AK_REMOVE: return_code = remove_action(args.arg1); break;
-        case AK_VIEW: return_code = view_action(); break;
+        case AK_VIEW: return_code = view_action(args.flags); break;
         case AK_GET: return_code = get_action(program_name, args.arg1); break;
         case AK_OPEN: return_code = open_action(program_name, args.arg1); break;
         case AK_TODAY: return_code = today_action(); break;
-        case AK_LIST: return_code = list_action(); break;
+        case AK_LIST: return_code = list_action(args.flags); break;
         case AK_FILTER: return_code = filter_action(program_name, args.arg1); break;
         case AK_SELECT: return_code = select_action(args.arg1); break;
         default: {
