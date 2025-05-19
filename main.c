@@ -1015,11 +1015,23 @@ static int add_action(char *name, char *filepath) {
 // `file_identifier` is the sha1
 static int remove_action(const char file_identifier[40]) {
     database_status_code_t status_code;
+    bool clean_current_selected_file = false;
 
-    // TODO: use config.h
-    /* if (file_identifier == NULL) {
-        id = database.current_selected_file_id;
-    } else  */
+    if (file_identifier == NULL) {
+        Wodo_Config_Value *out = NULL;
+
+        wodo_error_code_t code = wodo_get_config(selected_file_identifier_key, &out);
+
+        if (code != WODO_OK_CODE) {
+            fprintf(stderr, "\033[1;31merror:\033[0m could not remove \"%s\" due to: %s\n", file_identifier, wodo_error_string(code));
+
+            return code;
+        }
+
+        file_identifier = out->value;
+
+        clean_current_selected_file = true;
+    }
 
     Database_Db_File *file = NULL;
 
@@ -1038,6 +1050,16 @@ static int remove_action(const char file_identifier[40]) {
     database_delete_file(file);
 
     database_save(global_database);
+
+    if (clean_current_selected_file) {
+        wodo_error_code_t code = wodo_remove_config(selected_file_identifier_key);
+
+        if (code != WODO_OK_CODE) {
+            fprintf(stderr, "\033[1;31merror:\033[0m could not clean current selecte file \"%s\" due to: %s\n", file_identifier, wodo_error_string(code));
+
+            return code;
+        }
+    }
 
     return 0;
 }
@@ -1293,7 +1315,7 @@ static int get_action(const char *program_name, const char *file_identifier) {
         wodo_error_code_t code = wodo_get_config(selected_file_identifier_key, &out);
 
         if (code != WODO_OK_CODE) {
-            fprintf(stderr, "\033[1;31merror:\033[0m could not open \"%s\" due to: %s\n", file_identifier, wodo_error_string(code));
+            fprintf(stderr, "\033[1;31merror:\033[0m could not get \"%s\" due to: %s\n", file_identifier, wodo_error_string(code));
 
             return code;
         }
