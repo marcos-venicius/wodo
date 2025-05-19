@@ -104,13 +104,22 @@ static inline bool is_symbol(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
-static void show_current_selected_file(const Database *database) {
-    (void)database;
-    // TODO: use config.h to display current selected file
-    return;
-    /* if (database->selected_file == NULL) return;
+static void show_current_selected_file(void) {
+    Wodo_Config_Value *out = NULL;
 
-    fprintf(stdout, "current selected file: [ID:%ld] %s\n\n", database->selected_file->id, database->selected_file->filepath); */
+    wodo_error_code_t code = wodo_get_config(selected_file_identifier_key, &out);
+
+    if (code == WODO_KEY_NOT_FOUND_ERROR_CODE) return;
+    if (code != WODO_OK_CODE) {
+        fprintf(stderr, "\n\033[1;31merror:\033[0m could not get selected file due to %s\n", wodo_error_string(code));
+
+        return;
+    }
+    Database_Db_File *file = NULL;
+
+    database_get_file_by_identifier(&file, global_database, out->value);
+
+    fprintf(stdout, "current selected file: [ID:%s] %s\n\n", file->short_identifier, file->name);
 }
 
 // ---------------------------------------- Utils End ----------------------------------------
@@ -1038,7 +1047,7 @@ static int view_action(void) {
         return 0;
     }
 
-    show_current_selected_file(global_database);
+    show_current_selected_file();
 
     database_foreach_begin(*global_database) {
         printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
@@ -1060,7 +1069,7 @@ static int view_action(void) {
 }
 
 static int today_action(void) {
-    show_current_selected_file(global_database);
+    show_current_selected_file();
 
     database_foreach_begin(*global_database) {
         char *content;
@@ -1092,7 +1101,7 @@ static int today_action(void) {
 }
 
 static int list_action(void) {
-    show_current_selected_file(global_database);
+    show_current_selected_file();
 
     database_foreach_begin(*global_database) {
         printf("\033[1;33m%.*s\033[0m %s\n", SHORT_IDENTIFIER_SIZE, it->short_identifier, it->name);
@@ -1168,7 +1177,7 @@ static int filter_action(const char *program_name, const char *filter) {
         return 0;
     }
 
-    show_current_selected_file(global_database);
+    show_current_selected_file();
 
     Filters filters = {0};
 
@@ -1322,10 +1331,19 @@ static int open_action(const char *program_name, const char *file_identifier) {
     Database_Db_File *file = NULL;
     database_status_code_t status_code = DATABASE_OK_STATUS_CODE;
 
-    // TODO: use conf.h to get selected file
-    /* if (file_identifier == NULL) {
-        file = database.selected_file;
-    } else */
+    if (file_identifier == NULL) {
+        Wodo_Config_Value *out = NULL;
+
+        wodo_error_code_t code = wodo_get_config(selected_file_identifier_key, &out);
+
+        if (code != WODO_OK_CODE) {
+            fprintf(stderr, "\033[1;31merror:\033[0m could not open \"%s\" due to: %s\n", file_identifier, wodo_error_string(code));
+
+            return code;
+        }
+
+        file_identifier = out->value;
+    }
 
     if ((status_code = database_get_file_by_identifier(&file, global_database, file_identifier)) != DATABASE_OK_STATUS_CODE) {
         if (status_code == DATABASE_NOT_FOUND_STATUS_CODE) {
@@ -1371,7 +1389,13 @@ int main(int argc, char **argv) {
 
     Wodo_Config_Value *out = NULL;
 
-    status_code = wodo_get_config(wodo_config_key_from_cstr("selected_file_identifier"), out);
+    wodo_error_code_t code = wodo_get_config(selected_file_identifier_key, &out);
+
+    if (code != WODO_OK_CODE && code != WODO_KEY_NOT_FOUND_ERROR_CODE) {
+        fprintf(stderr, "\n\033[1;31merror:\033[0m could not get selected file due to %s\n", wodo_error_string(code));
+
+        defer(code);
+    }
 
     bool does_have_selected_file = status_code == DATABASE_OK_STATUS_CODE;
 
@@ -1483,6 +1507,7 @@ int main(int argc, char **argv) {
         case AK_FILTER: return_code = filter_action(program_name, args.arg1); break;
         case AK_SELECT: return_code = select_action(args.arg1); break;
         default: {
+            show_current_selected_file();
             usage(stderr, program_name, NULL);
             return_code = 1;
         } break;

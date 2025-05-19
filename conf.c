@@ -457,7 +457,7 @@ wodo_error_code_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_V
     return WODO_OK_CODE;
 }
 
-wodo_error_code_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *out) {
+wodo_error_code_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value **out) {
     if (config_filepath == NULL) return WODO_MISSING_CONFIG_FILE_LOCATION_ERROR_CODE;
 
     if (out == NULL) return WODO_OK_CODE;
@@ -493,10 +493,9 @@ wodo_error_code_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *
                 if (cmp_sized_strings(row->key.value, row->key.size, key.value, key.size)) {
                     fclose(file);
 
-                    *out = (Wodo_Config_Value){
-                        .size = row->value.size,
-                        .value = row->value.value
-                    };
+                    *out = malloc(sizeof(Wodo_Config_Value));
+                    (*out)->size = row->value.size;
+                    (*out)->value = row->value.value;
 
                     return WODO_OK_CODE;
                 }

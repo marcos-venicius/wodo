@@ -28,7 +28,7 @@ const char *wodo_error_string(wodo_error_code_t code);
 void wodo_setup_config_file_location(const char *filepath);
 wodo_error_code_t wodo_set_config(const Wodo_Config_Key key, const Wodo_Config_Value value);
 wodo_error_code_t wodo_remove_config(const Wodo_Config_Key key);
-wodo_error_code_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value *out);
+wodo_error_code_t wodo_get_config(const Wodo_Config_Key key, Wodo_Config_Value **out);
 
 // TODO: hash the key using sha1 and compress value. so we can standardize the key and prevent large data being stored.
 //       allow the user to choose if he want to use this approach.
