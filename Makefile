@@ -1,14 +1,14 @@
 CXX = clang
-CXX_FLAGS = -Wall -Wextra -pedantic -ggdb 
+CXX_FLAGS = -Wall -Wextra -pedantic
 OPENSSL_FLAGS = `pkg-config --libs --cflags openssl`
-BUILD_FLAGS =
+BUILD_FLAGS = -ggdb
 OUTPUT_FOLDER = ./bin
-
-.PHONY: directories
 
 ifeq ($(BUILD), 1)
 	BUILD_FLAGS = -O3 -march=native -flto -fPIE -pie -fno-semantic-interposition -fvisibility=hidden
 endif
+
+.PHONY: directories
 
 all: directories $(OUTPUT_FOLDER)/wodo
 
