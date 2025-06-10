@@ -42,5 +42,10 @@ database_status_code_t database_get_file_by_identifier(Database_Db_File **out, c
 database_status_code_t database_add_file(Database *database, Database_Db_File *file);
 void database_delete_file(Database_Db_File *file);
 const char *database_status_code_string(database_status_code_t status_code);
+// this function returns a file path inside the data folder with 
+// a hash of the name suffixed with the current unix UTC timestamp
+// /path/to/data/folder/<name-hash>-unix.todo.md
+// You need to free the memory of the return string when you're done
+char *get_unix_filepath(const char *name, size_t name_size);
 
 #endif // _WODO_DATABASE_H_

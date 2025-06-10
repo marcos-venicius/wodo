@@ -126,6 +126,7 @@ static void show_current_selected_file(void) {
 
 typedef enum {
     AK_ADD = 1,
+    AK_ADD_PATH,
     AK_REMOVE,
     AK_VIEW,
     AK_GET,
@@ -932,7 +933,7 @@ static void usage(FILE *stream, const char *program_name, char *error_message, .
 
     fprintf(stream, "%s [action] [arguments?] [flags?]\n", program_name);
     fprintf(stream, "\n");
-    fprintf(stream, "    add     a    [title] [filename]                       add a new file to the tracking system\n");
+    fprintf(stream, "    add     a    [title] [filepath?]                      add a new file to the tracking system\n");
     fprintf(stream, "    remove  r    [id] or nothing if selected              remove a file from the tracking system\n");
     fprintf(stream, "    get     g    [id] or nothing if selected              get specific file by path or id\n");
     fprintf(stream, "    open    o    [id] or nothing if selected              open a file using vim by path or id\n");
@@ -946,6 +947,9 @@ static void usage(FILE *stream, const char *program_name, char *error_message, .
     fprintf(stream, "                 [ts=past|future|present]                 search for time state\n");
     fprintf(stream, "                 [s=todo|doing|done]                      search for current task state\n");
     fprintf(stream, "    help    h                                             display this message\n");
+    fprintf(stream, "\n");
+    fprintf(stream, "When you run `add` without a filepath the system will create a new file\n");
+    fprintf(stream, "inside the root folder of the application\n");
 
     if (error_message != NULL) {
         va_start(args, error_message);
@@ -977,7 +981,7 @@ static inline bool arg_cmp(const char *actual, const char *expected, const char 
     return  expected_result || alternative_result;
 }
 
-static int add_action(char *name, char *filepath) {
+static int add_path_action(char *name, char *filepath) {
     char *abs_path = realpath(filepath, NULL);
 
     if (abs_path == NULL) {
@@ -1025,6 +1029,26 @@ static int add_action(char *name, char *filepath) {
     database_save(global_database);
 
     return 0;
+}
+
+static int add_action(char *name) {
+    char *path = get_unix_filepath(name, strlen(name));
+
+    FILE* file = fopen(path, "w");
+
+    if (file == NULL) {
+        fprintf(stderr, "\033[1;31merror:\033[0m could not add file due to: %s\n", strerror(errno));
+
+        return 1;
+    }
+
+    fclose(file);
+
+    int return_code = add_path_action(name, path);
+
+    free(path);
+
+    return return_code;
 }
 
 // `file_identifier` is the sha1
@@ -1479,7 +1503,7 @@ int main(int argc, char **argv) {
             char *arg1 = shift(&argc, &argv);
 
             if (arg1 == NULL) {
-                usage(stderr, program_name, "option \"%s\" expects a name and a filename", arg);
+                usage(stderr, program_name, "option \"%s\" at least a title", arg);
 
                 defer(1);
             }
@@ -1487,14 +1511,13 @@ int main(int argc, char **argv) {
             char *arg2 = shift(&argc, &argv);
 
             if (arg2 == NULL) {
-                usage(stderr, program_name, "option \"%s\" expects a name and a filename", arg);
-
-                defer(1);
+                args.kind = AK_ADD;
+                args.arg1 = arg1;
+            } else {
+                args.kind = AK_ADD_PATH;
+                args.arg1 = arg1;
+                args.arg2 = arg2;
             }
-
-            args.kind = AK_ADD;
-            args.arg1 = arg1;
-            args.arg2 = arg2;
         } else if (arg_cmp(arg, "remove", "r")) {
             char *value = shift(&argc, &argv);
 
@@ -1570,7 +1593,8 @@ int main(int argc, char **argv) {
     }
 
     switch (args.kind) {
-        case AK_ADD: return_code = add_action(args.arg1, args.arg2); break;
+        case AK_ADD_PATH: return_code = add_path_action(args.arg1, args.arg2); break;
+        case AK_ADD: return_code = add_action(args.arg1);
         case AK_REMOVE: return_code = remove_action(args.arg1); break;
         case AK_VIEW: return_code = view_action(args.flags); break;
         case AK_GET: return_code = get_action(program_name, args.arg1); break;

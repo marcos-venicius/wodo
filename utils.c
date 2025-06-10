@@ -107,3 +107,7 @@ char *join_paths(const char *text, ...) {
 
     return resulting_path;
 }
+
+unsigned long get_current_timestamp(void) {
+    return (unsigned long)time(NULL);
+}

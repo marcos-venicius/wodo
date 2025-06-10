@@ -1,5 +1,7 @@
 #include "./database.h"
 #include "./utils.h"
+#include "crypt.h"
+#include <openssl/sha.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -244,6 +246,30 @@ database_status_code_t database_add_file(Database *database, Database_Db_File *f
     array_append(database, file);
 
     return DATABASE_OK_STATUS_CODE;
+}
+
+char *get_unix_filepath(const char *name, size_t name_size) {
+    const char *user_home_folder = get_user_home_folder();
+
+    unsigned char *hash = hash_bytes(name, name_size);
+
+    unsigned long timestamp = get_current_timestamp();
+
+    size_t hash_size = SHA_DIGEST_LENGTH * 2;
+    size_t user_home_folder_size = strlen(user_home_folder);
+    size_t db_folder_name_size = strlen(db_folder_name);
+    size_t timestamp_size = 20;
+    size_t extension_size = strlen(".todo.md");
+
+    size_t total_size = user_home_folder_size + 1 + db_folder_name_size + 1 + hash_size + 1 + timestamp_size + extension_size + 1;
+    // user_home_folder_size'/'db_folder_name_size'/'hash_size'-'timestamp_size'.todo.md'\0
+    char *file_path = malloc(total_size);
+
+    snprintf(file_path, total_size, "%s/%s/%s-%lu.todo.md", user_home_folder, db_folder_name, hash, timestamp);
+
+    free(hash);
+
+    return file_path;
 }
 
 void database_delete_file(Database_Db_File *file)
