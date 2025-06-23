@@ -63,7 +63,7 @@ char *join_paths(const char *text, ...) {
     va_start(args, text);
 
     size_t string_size = 0;
-    char *resulting_path = malloc(0);
+    char *resulting_path = NULL;
 
     for (size_t i = 0; i < strlen(text); ++i) {
         switch (text[i]) {

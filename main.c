@@ -1640,7 +1640,7 @@ int main(int argc, char **argv) {
 
     switch (args.kind) {
         case AK_ADD_PATH: return_code = add_path_action(args.arg1, args.arg2); break;
-        case AK_ADD: return_code = add_action(args.arg1);
+        case AK_ADD: return_code = add_action(args.arg1); break;
         case AK_REMOVE: return_code = remove_action(args.arg1); break;
         case AK_VIEW: return_code = view_action(args.flags); break;
         case AK_GET: return_code = get_action(program_name, args.arg1); break;
