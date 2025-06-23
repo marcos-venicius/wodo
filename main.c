@@ -355,21 +355,71 @@ typedef struct {
     Token *tokens;
 } Parser;
 
-// Week days
-static const char *sunday = "Sunday";
-static const size_t sunday_size = 6;
-static const char *monday = "Monday";
-static const size_t monday_size = 6;
-static const char *tuesday = "Tuesday";
-static const size_t tuesday_size = 7;
-static const char *wednesday = "Wednesday";
-static const size_t wednesday_size = 9;
-static const char *thursday = "Thursday";
-static const size_t thursday_size = 8;
-static const char *friday = "Friday";
-static const size_t friday_size = 6;
-static const char *saturday = "Saturday";
-static const size_t saturday_size = 8;
+typedef struct {
+    char     *pt_br;
+    char     *en_us;
+    char     *pt_br_lc;
+    char     *en_us_lc;
+    Week_Day week_day;
+} Week_Day_Tranlsation;
+
+typedef struct {
+    Week_Day_Tranlsation week_days[14];
+} Translations;
+
+static Translations translations = {
+    .week_days = {
+        {
+            .pt_br = "Domingo",
+            .en_us = "Sunday",
+            .pt_br_lc = "domingo",
+            .en_us_lc = "sunday",
+            .week_day = WD_SUNDAY
+        },
+        {
+            .pt_br = "Segunda",
+            .en_us = "Monday",
+            .pt_br_lc = "segunda",
+            .en_us_lc = "monday",
+            .week_day = WD_MONDAY
+        },
+        {
+            .pt_br = "Terça",
+            .en_us = "Tuesday",
+            .pt_br_lc = "terça",
+            .en_us_lc = "tuesday",
+            .week_day = WD_TUESDAY
+        },
+        {
+            .pt_br = "Quarta",
+            .en_us = "Wednesday",
+            .pt_br_lc = "quarta",
+            .en_us_lc = "wednesday",
+            .week_day = WD_WEDNESDAY
+        },
+        {
+            .pt_br = "Quinta",
+            .en_us = "Thursday",
+            .pt_br_lc = "quinta",
+            .en_us_lc = "thursday",
+            .week_day = WD_THURSDAY
+        },
+        {
+            .pt_br = "Sexta",
+            .en_us = "Friday",
+            .pt_br_lc = "sexta",
+            .en_us_lc = "friday",
+            .week_day = WD_FRIDAY
+        },
+        {
+            .pt_br = "Sábado",
+            .en_us = "Saturday",
+            .pt_br_lc = "sábado",
+            .en_us_lc = "saturday",
+            .week_day = WD_SATURDAY
+        }
+    }
+};
 
 // States
 static const char *todo = "Todo";
@@ -566,24 +616,20 @@ static Token *consume_token(Parser *parser) {
 }
 
 static Week_Day parse_week_day(const char *sized_string, size_t size) {
-    if (cmp_sized_strings(sunday, sized_string, sunday_size, size)) {
-        return WD_SUNDAY;
-    } else if (cmp_sized_strings(monday, sized_string, monday_size, size)) {
-        return WD_MONDAY;
-    } else if (cmp_sized_strings(tuesday, sized_string, tuesday_size, size)) {
-        return WD_TUESDAY;
-    } else if (cmp_sized_strings(wednesday, sized_string, wednesday_size, size)) {
-        return WD_WEDNESDAY;
-    } else if (cmp_sized_strings(thursday, sized_string, thursday_size, size)) {
-        return WD_THURSDAY;
-    } else if (cmp_sized_strings(friday, sized_string, friday_size, size)) {
-        return WD_FRIDAY;
-    } else if (cmp_sized_strings(saturday, sized_string, saturday_size, size)) {
-        return WD_SATURDAY;
-    } else {
-        fprintf(stderr, "\033[1;31merror\033[0m invalid file format. unrecognized week day \"%.*s\"\n", (int)size, sized_string);
-        exit(1);
+    for (int i = 0; sizeof(translations.week_days) / sizeof(translations.week_days[0]); ++i) {
+        Week_Day_Tranlsation w = translations.week_days[i];
+
+        size_t pt_br_size = strlen(w.pt_br);
+        size_t en_us_size = strlen(w.en_us);
+
+        if (cmp_sized_strings(w.pt_br, sized_string, pt_br_size, size)) return w.week_day;
+        if (cmp_sized_strings(w.en_us, sized_string, en_us_size, size)) return w.week_day;
+        if (cmp_sized_strings(w.pt_br_lc, sized_string, pt_br_size, size)) return w.week_day;
+        if (cmp_sized_strings(w.en_us_lc, sized_string, en_us_size, size)) return w.week_day;
     }
+
+    fprintf(stderr, "\033[1;31merror\033[0m invalid file format. unrecognized week day \"%.*s\"\n", (int)size, sized_string);
+    exit(1);
 
     return -1;
 }

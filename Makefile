@@ -13,22 +13,22 @@ endif
 all: directories $(OUTPUT_FOLDER)/wodo
 
 $(OUTPUT_FOLDER)/wodo: main.o conf.o database.o crypt.o utils.o
-	$(CXX) $(CXX_FLAGS) $(OPENSSL_FLAGS) $(BUILD_FLAGS) -o $(OUTPUT_FOLDER)/wodo $^
+	$(CXX) $(CXX_FLAGS) $(OPENSSL_FLAGS) -o $(OUTPUT_FOLDER)/wodo $^
 
 main.o: main.c utils.c utils.h crypt.c crypt.h database.h disk_database.c
-	$(CXX) $(CXX_FLAGS) -c main.c -o main.o
+	$(CXX) $(CXX_FLAGS) $(BUILD_FLAGS) -c main.c -o main.o
 
 conf.o: conf.c conf.h
-	$(CXX) $(CXX_FLAGS) -c conf.c -o conf.o
+	$(CXX) $(CXX_FLAGS) $(BUILD_FLAGS) -c conf.c -o conf.o
 
 database.o: disk_database.c database.h utils.c utils.h
-	$(CXX) $(CXX_FLAGS) -c disk_database.c -o database.o
+	$(CXX) $(CXX_FLAGS) $(BUILD_FLAGS) -c disk_database.c -o database.o
 
 utils.o: utils.c utils.h
-	$(CXX) $(CXX_FLAGS) -c utils.c -o utils.o
+	$(CXX) $(CXX_FLAGS) $(BUILD_FLAGS) -c utils.c -o utils.o
 
 crypt.o: crypt.c crypt.h
-	$(CXX) $(CXX_FLAGS) -c crypt.c -o crypt.o
+	$(CXX) $(CXX_FLAGS) $(BUILD_FLAGS) -c crypt.c -o crypt.o
 
 directories: $(OUTPUT_FOLDER)
 
