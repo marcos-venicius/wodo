@@ -1476,14 +1476,18 @@ static int open_action(const char *program_name, const char *file_identifier) {
         Wodo_Config_Value *out = NULL;
 
         wodo_error_code_t code = wodo_get_config(selected_file_identifier_key, &out);
-
-        if (code != WODO_OK_CODE) {
-            fprintf(stderr, "\033[1;31merror:\033[0m could not open \"%s\" due to: %s\n", file_identifier, wodo_error_string(code));
-
-            return code;
+        
+        switch (code) {
+            case WODO_OK_CODE:
+                file_identifier = out->value;
+                break;
+            case WODO_KEY_NOT_FOUND_ERROR_CODE:
+                fprintf(stderr, "\033[1;31merror:\033[0m you should specify a file name if you don't have any selected\n");
+                return code;
+            default:
+                fprintf(stderr, "\033[1;31merror:\033[0m something went wrong when trying to get selected file: %s\n", wodo_error_string(code));
+                return code;
         }
-
-        file_identifier = out->value;
     }
 
     if ((status_code = database_get_file_by_identifier(&file, global_database, file_identifier)) != DATABASE_OK_STATUS_CODE) {
