@@ -1,0 +1,47 @@
+% Basic title
+
+.state done
+.tags  frontend testing
+.date  2026-03-05 21:56:11-03:00
+
+% Second title
+
+.state done
+.tags
+.date  2026-03-05 21:56:11+03:00
+
+% Third title
+
+.state doing
+.tags  ux_ui
+.date  2026-03-05 21:56:11Z
+
+# This is my description
+
+A task should have a title which starts with '%';
+
+We'll have timezoned dates.
+We're going to use the ISO-8601.
+
+This: "2026-03-05 21:56:11Z" is a UTC date.
+This: "2026-03-05 21:56:11-03:00" is a -3 hours timezone date.
+This: "2026-03-05 21:56:11+02:00" is a +2 hours timezoned date.
+
+We can have description with multiple lines.
+We have some states: todo, doing, blocked and done.
+
+The description is not required.
+
+You can have none, one or many tags.
+
+It's prefered to always specify the state with .state; but you can omit, and by default the state is gonna be todo.
+You can omit the .tags property.
+The .date is required.
+
+we have only three properties right now .state, .tags, .date;
+
+After the properties, every line that does not starts with '%' is the description of this task.
+
+% Hello world
+
+.date  2026-03-05 21:56:11-03:00
