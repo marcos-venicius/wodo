@@ -41,3 +41,7 @@ and some other stuff.
 
 **And of course, I need to refactor this mess of almost _2000_ lines main.c file (now) :)**
 
+### ✨ It's comming a brand new wodo file format ✨
+
+<img width="1203" height="668" alt="image" src="https://github.com/user-attachments/assets/2c86aa76-865e-4b1c-9b87-30e7bb57eff7" />
+
