@@ -17,6 +17,8 @@ There is a brand new syntax and way to use.
 
 ## Using as a CLI
 
+<img width="1313" height="555" alt="image" src="https://github.com/user-attachments/assets/7269252a-069f-49f5-a64c-6bc2d90a0206" />
+
 You can create `.todo.md` files wherever you want and just call `wodo add <title> /path/to/file` and that's it.
 
 Everytime you want to check all of your todos you can just do `wodo view`, this will list every todo file you have, parse and display it to you.
