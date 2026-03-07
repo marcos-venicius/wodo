@@ -1,5 +1,5 @@
 CXX = clang
-CXX_FLAGS = -Wall -Wextra -pedantic -lm
+CXX_FLAGS = -Wall -Wextra -pedantic
 OPENSSL_FLAGS = `pkg-config --libs --cflags openssl`
 BUILD_FLAGS =
 DEBUG_FLAGS = -ggdb
@@ -15,7 +15,7 @@ endif
 all: directories $(OUTPUT_FOLDER)/wodo
 
 $(OUTPUT_FOLDER)/wodo: wodo.o parser.o io.o date.o
-	$(CXX) $(CXX_FLAGS) $(OPENSSL_FLAGS) $(BUILD_FLAGS) -o $(OUTPUT_FOLDER)/wodo $^
+	$(CXX) $(CXX_FLAGS) $(OPENSSL_FLAGS) $(BUILD_FLAGS) -lm -o $(OUTPUT_FOLDER)/wodo $^
 
 wodo.o: wodo.c parser.h parser.c ./clibs/arr.h io.h io.c systemtypes.h
 	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c wodo.c -o wodo.o
