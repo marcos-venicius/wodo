@@ -245,6 +245,88 @@ local function goto_description()
   vim.api.nvim_win_set_cursor(0, { i + 1, 0 })
 end
 
+local function next_task()
+  local buf = vim.api.nvim_get_current_buf()
+  local row = vim.api.nvim_win_get_cursor(0)[1]
+  local line_count = vim.api.nvim_buf_line_count(buf)
+
+  for i = row, line_count - 1 do
+    local line = vim.api.nvim_buf_get_lines(buf, i, i+1, false)[1]
+
+    if line:match("^%%") then
+      local col = line:match("^%% ") and 2 or 1
+      vim.api.nvim_win_set_cursor(0, { i + 1, col })
+      return
+    end
+  end
+end
+
+local function prev_task()
+  local buf = vim.api.nvim_get_current_buf()
+  local row = vim.api.nvim_win_get_cursor(0)[1] - 2
+
+  for i = row, 0, -1 do
+    local line = vim.api.nvim_buf_get_lines(buf, i, i+1, false)[1]
+
+    if line:match("^%%") then
+      local col = line:match("^%% ") and 2 or 1
+      vim.api.nvim_win_set_cursor(0, { i + 1, col })
+      return
+    end
+  end
+end
+
+local function task_picker()
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
+
+  local buf = vim.api.nvim_get_current_buf()
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+
+  local tasks = {}
+
+  for i, line in ipairs(lines) do
+    if line:match("^%%") then
+      local title = line:gsub("^%% ?", "")
+      table.insert(tasks, {
+        line = i,
+        display = title,
+      })
+    end
+  end
+
+  pickers.new({}, {
+    prompt_title = "Tasks",
+    finder = finders.new_table({
+      results = tasks,
+      entry_maker = function(entry)
+        return {
+          value = entry,
+          display = entry.display,
+          ordinal = entry.display,
+          line = entry.line,
+        }
+      end,
+    }),
+
+    sorter = conf.generic_sorter({}),
+
+    attach_mappings = function(_, map)
+      actions.select_default:replace(function(prompt_bufnr)
+        local selection = action_state.get_selected_entry()
+        actions.close(prompt_bufnr)
+
+        vim.api.nvim_win_set_cursor(0, { selection.line, 0 })
+      end)
+
+      return true
+    end,
+  }):find()
+end
+
 vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
   group = group,
   pattern = { "*.wodo" },
@@ -257,5 +339,9 @@ vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
     vim.keymap.set("n", "<leader>wgt", goto_tags)
     vim.keymap.set("n", "<leader>wgT", goto_title)
     vim.keymap.set("n", "<leader>wgd", goto_description)
+    vim.keymap.set("n", "]w", next_task)
+    vim.keymap.set("n", "[w", prev_task)
+    vim.keymap.set("n", "<leader>tw", task_picker)
   end
 })
+
