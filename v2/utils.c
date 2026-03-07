@@ -165,3 +165,32 @@ bool arg_cmp(const char *actual, const char *expected, const char *alternative) 
 
     return  expected_result || alternative_result;
 }
+
+void print_scaped_string_to_fd(wodo_string_t string, FILE *file) {
+    fprintf(file, "\"");
+    size_t last_index = 0;
+
+    for (size_t i = 0; i < string.length; i++) {
+        switch (string.value[i]) {
+            case '"': {
+                fprintf(file, "%.*s", (int)(i - last_index), string.value + last_index);
+                fprintf(file, "\\\"");
+
+                // skip double quotes
+                last_index = i + 1;
+            } break;
+            case '\n': {
+                fprintf(file, "%.*s", (int)(i - last_index), string.value + last_index);
+                fprintf(file, "\\n");
+
+                // skip double quotes
+                last_index = i + 1;
+            } break;
+        }
+    }
+
+    if (last_index < string.length)
+        fprintf(file, "%.*s", (int)(string.length - last_index), string.value + last_index);
+
+    fprintf(file, "\"");
+}

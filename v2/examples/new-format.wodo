@@ -1,11 +1,8 @@
 % Title
 
-.state todo
+.state doing
 .date  2026-02-28 21:56:11-14:00
 .tags  backend javascript c_sharp
-
-
-
 
 Description
 
@@ -14,10 +11,6 @@ Description
 .state done
 .tags
 .date  2026-03-05 21:56:11+03:00
-
-
-
-
 
 % Third title
 
@@ -54,4 +47,3 @@ After the properties, every line that does not starts with '%' is the descriptio
 % Hello world
 
 .date  2026-03-05 21:56:11-03:00
-

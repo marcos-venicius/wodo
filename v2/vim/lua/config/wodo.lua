@@ -1,45 +1,3 @@
-local function add_todo_boilerplate()
-  local date = os.date("%A %d-%m-%y %H:%M - %H:%M")
-  local text = '"" ' .. date .. ' Todo'
-
-  local row = vim.api.nvim_win_get_cursor(0)[1] - 1
-  local line = vim.api.nvim_get_current_line()
-
-  if line == "" then
-    vim.api.nvim_set_current_line(text)
-  else
-    vim.api.nvim_buf_set_lines(0, row + 1, row + 1, false, { text })
-    vim.api.nvim_win_set_cursor(0, { row + 2, 0 })
-  end
-end
-
-local function set_state(state)
-  local line = vim.api.nvim_get_current_line()
-
-  if string.match(line, "Todo$") then
-    line = line:gsub(" Todo$", " " .. state)
-  elseif string.match(line, "Doing$") then
-    line = line:gsub(" Doing$", " " .. state)
-  elseif string.match(line, "Done$") then
-    line = line:gsub(" Done$", " " .. state)
-  end
-
-  vim.api.nvim_set_current_line(line)
-end
-
-local group = vim.api.nvim_create_augroup("WodoFile", { clear = true })
-
-vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
-  group = group,
-  pattern = { "*.todo.md" },
-  callback = function()
-    vim.keymap.set("n", "<leader>t", function() set_state("Todo") end)
-    vim.keymap.set("n", "<leader>i", function() set_state("Doing") end)
-    vim.keymap.set("n", "<leader>c", function() set_state("Done") end)
-    vim.keymap.set("n", "<leader>a", add_todo_boilerplate)
-  end,
-})
-
 local function create_task_boilerplate()
   local date = os.date("%Y-%m-%d %H:%M:%S%z")
 
@@ -80,7 +38,7 @@ local function set_task_state(state)
   -- find task start (%)
   local start = nil
   for i = row, 0, -1 do
-    local line = vim.api.nvim_buf_get_lines(buf, i, i+1, false)[1]
+    local line = vim.api.nvim_buf_get_lines(buf, i, i + 1, false)[1]
     if line:match("^%%") then
       start = i
       break
@@ -94,7 +52,7 @@ local function set_task_state(state)
   -- find task end (next % or EOF)
   local finish = line_count
   for i = start + 1, line_count - 1 do
-    local line = vim.api.nvim_buf_get_lines(buf, i, i+1, false)[1]
+    local line = vim.api.nvim_buf_get_lines(buf, i, i + 1, false)[1]
     if line:match("^%%") then
       finish = i
       break
@@ -103,10 +61,17 @@ local function set_task_state(state)
 
   -- search for .state inside block
   for i = start, finish - 1 do
-    local line = vim.api.nvim_buf_get_lines(buf, i, i+1, false)[1]
+    local line = vim.api.nvim_buf_get_lines(buf, i, i + 1, false)[1]
 
     if line:match("^%.state") then
-      vim.api.nvim_buf_set_lines(buf, i, i+1, false, {".state " .. state})
+      vim.api.nvim_buf_set_lines(buf, i, i + 1, false, { ".state " .. state })
+
+      -- save file
+      vim.cmd("write")
+
+      -- return to normal mode
+      vim.cmd("stopinsert")
+
       return
     end
   end
@@ -327,21 +292,170 @@ local function task_picker()
   }):find()
 end
 
+local function create_tasks_file()
+  vim.ui.input({ prompt = "Tasks file name: " }, function(input)
+    if not input or input == "" then
+      return
+    end
+
+    vim.system({ "wodo", "a", input }, { text = true }, function(result)
+      if result.code ~= 0 then
+        vim.schedule(function()
+          vim.notify("Failed to create tasks file", vim.log.levels.ERROR)
+        end)
+        return
+      end
+
+      local path = vim.trim(result.stdout)
+
+      vim.schedule(function()
+        -- open the created file
+        vim.cmd("edit " .. path)
+
+        -- run your boilerplate function
+        create_task_boilerplate()
+      end)
+    end)
+  end)
+end
+
+local function telescope_list_tasks()
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
+
+  vim.system({ "wodo", "l" }, { text = true }, function(result)
+    if result.code ~= 0 then
+      vim.schedule(function()
+        vim.notify("Failed to list task files", vim.log.levels.ERROR)
+      end)
+      return
+    end
+
+    local ok, data = pcall(vim.json.decode, result.stdout)
+    if not ok then
+      vim.schedule(function()
+        vim.notify("Invalid JSON from wodo", vim.log.levels.ERROR)
+      end)
+      return
+    end
+
+    vim.schedule(function()
+      pickers.new({}, {
+        prompt_title = "Wodo Task Files",
+
+        finder = finders.new_table({
+          results = data,
+
+          entry_maker = function(item)
+            return {
+              value = item,                 -- store full object
+              ordinal = item.name,          -- used for sorting/search
+              display = item.name,          -- what Telescope shows
+            }
+          end,
+        }),
+
+        sorter = conf.generic_sorter({}),
+
+        attach_mappings = function(prompt_bufnr)
+          actions.select_default:replace(function()
+            local entry = action_state.get_selected_entry()
+            actions.close(prompt_bufnr)
+
+            local path = entry.value.path
+            vim.cmd({ cmd = "edit", args = { path } })
+          end)
+
+          return true
+        end,
+      }):find()
+    end)
+  end)
+end
+
+local function confirm_delete(on_confirm)
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
+
+  pickers.new({}, {
+    prompt_title = "Delete file?",
+
+    finder = finders.new_table({
+      results = { "no", "yes" },
+    }),
+
+    sorter = conf.generic_sorter({}),
+
+    attach_mappings = function(prompt_bufnr)
+      actions.select_default:replace(function()
+        local choice = action_state.get_selected_entry()[1]
+        actions.close(prompt_bufnr)
+
+        if choice == "yes" then
+          on_confirm()
+        end
+      end)
+
+      return true
+    end,
+  }):find()
+end
+
+local function delete_current_tasks_file()
+  local path = vim.api.nvim_buf_get_name(0)
+
+  if path == "" then
+    vim.notify("Buffer has no file path", vim.log.levels.WARN)
+    return
+  end
+
+  confirm_delete(function()
+    vim.system({ "wodo", "r", path }, { text = true }, function(result)
+      if result.code ~= 0 then
+        vim.schedule(function()
+          vim.notify("Failed to delete file", vim.log.levels.ERROR)
+        end)
+        return
+      end
+
+      vim.schedule(function()
+        vim.cmd("bdelete!")
+        vim.notify("Tasks file deleted")
+      end)
+    end)
+  end)
+end
+
 vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
   group = group,
   pattern = { "*.wodo" },
   callback = function()
-    vim.keymap.set("n", "<leader>wt", create_task_boilerplate)
-    vim.keymap.set("n", "<leader>wst", function() set_task_state("todo") end)
-    vim.keymap.set("n", "<leader>wsi", function() set_task_state("doing") end)
-    vim.keymap.set("n", "<leader>wsb", function() set_task_state("blocked") end)
-    vim.keymap.set("n", "<leader>wsd", function() set_task_state("done") end)
-    vim.keymap.set("n", "<leader>wgt", goto_tags)
-    vim.keymap.set("n", "<leader>wgT", goto_title)
-    vim.keymap.set("n", "<leader>wgd", goto_description)
+    vim.keymap.set("n", "<leader>wn", create_task_boilerplate)
+    vim.keymap.set("n", "<leader>wt", function() set_task_state("todo") end)
+    vim.keymap.set("n", "<leader>wi", function() set_task_state("doing") end)
+    vim.keymap.set("n", "<leader>wb", function() set_task_state("blocked") end)
+    vim.keymap.set("n", "<leader>wd", function() set_task_state("done") end)
+    vim.keymap.set("n", "<leader>wx", delete_current_tasks_file)
+    vim.keymap.set("n", "gt", goto_title)
+    vim.keymap.set("n", "gd", goto_description)
+    vim.keymap.set("n", "gT", goto_tags)
     vim.keymap.set("n", "]w", next_task)
     vim.keymap.set("n", "[w", prev_task)
-    vim.keymap.set("n", "<leader>tw", task_picker)
+    vim.keymap.set("n", "<leader>wl", task_picker)
   end
 })
 
+vim.api.nvim_create_autocmd("BufEnter", {
+  group = group,
+  pattern = "*",
+  callback = function()
+    vim.keymap.set("n", "<leader>wa", create_tasks_file)
+    vim.keymap.set("n", "<leader>wL", telescope_list_tasks)
+  end
+})

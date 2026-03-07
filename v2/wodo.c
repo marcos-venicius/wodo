@@ -13,22 +13,6 @@
 #include "./json.h"
 #include "./io.h"
 
-int main2() {
-    char *content = NULL;
-
-    const char *filename = "./examples/new-format.wodo";
-
-    size_t length = read_from_file(filename, &content);
-
-    wodo_task_t *tasks = parse_tasks(filename, content, length);
-
-    print_tasks_to_stdout_as_json(tasks);
-
-    cl_arr_free(tasks);
-
-    return 0;
-}
-
 static Database global_database = {0};
 static SysDateTime today_date;
 static time_t today_date_timestamp;
@@ -135,6 +119,8 @@ static int add_action(char *name) {
     fclose(file);
 
     int return_code = add_path_action(name, path);
+
+    printf("%s\n", path);
 
     free(path);
 

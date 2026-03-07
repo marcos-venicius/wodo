@@ -12,6 +12,7 @@
 #include <assert.h>
 
 static const char *db_folder_name = ".wodo";
+static const char *file_extension = ".wodo";
 static const char *db_filename = ".wodo.db";
 
 static const char *get_database_filepath(void) {
@@ -109,25 +110,25 @@ database_status_code_t database_load(Database *out) {
             return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
         }
 
-        uint64_t filepath_size;
+        uint64_t path_size;
 
-        if (fread(&filepath_size, sizeof(uint64_t), 1, file) != 1) {
+        if (fread(&path_size, sizeof(uint64_t), 1, file) != 1) {
             fclose(file);
             free_db_file(db_file);
             cl_arr_free(out->files);
             return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
         }
 
-        if (filepath_size == 0) {
+        if (path_size == 0) {
             fclose(file);
             free_db_file(db_file);
             cl_arr_free(out->files);
             return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
         }
 
-        db_file->filepath = malloc(filepath_size);
+        db_file->filepath = malloc(path_size);
 
-        if (fread(db_file->filepath, sizeof(char), filepath_size, file) != filepath_size) {
+        if (fread(db_file->filepath, sizeof(char), path_size, file) != path_size) {
             fclose(file);
             free_db_file(db_file);
             cl_arr_free(out->files);
@@ -152,28 +153,29 @@ void database_save(Database *database) {
         exit(1);
     }
 
-    uint64_t actual_db_size = 0;
+    size_t length = 0;
 
     for (size_t i = 0; i < cl_arr_len(database->files); i++) {
         Database_Db_File *it = database->files[i];
 
         if (it->deleted) continue;
-        actual_db_size++;
+
+        length++;
     }
 
-    fwrite(&actual_db_size, sizeof(uint64_t), 1, file);
+    fwrite(&length, sizeof(uint64_t), 1, file);
 
     for (size_t i = 0; i < cl_arr_len(database->files); i++) {
         Database_Db_File *it = database->files[i];
+
         if (it->deleted) continue;
+        uint64_t name_size = strlen(it->name) + 1; // needs to save the null terminator
+        uint64_t path_size = strlen(it->filepath) + 1; // needs to save the null terminator
 
-        uint64_t filename_size = strlen(it->name);
-        uint64_t filepath_size = strlen(it->filepath);
-
-        fwrite(&filename_size, sizeof(uint64_t), 1, file);
-        fwrite(it->name, sizeof(char), filename_size, file);
-        fwrite(&filepath_size, sizeof(uint64_t), 1, file);
-        fwrite(it->filepath, sizeof(char), filepath_size, file);
+        fwrite(&name_size, sizeof(uint64_t), 1, file);
+        fwrite(it->name, sizeof(char), name_size, file);
+        fwrite(&path_size, sizeof(uint64_t), 1, file);
+        fwrite(it->filepath, sizeof(char), path_size, file);
     }
 
     fclose(file);
@@ -222,26 +224,15 @@ database_status_code_t database_add_file(Database *database, Database_Db_File *f
 
 char *get_unix_filepath(const char *name, size_t name_size) {
     const char *user_home_folder = get_user_home_folder();
-
     unsigned char *hash = hash_bytes(name, name_size);
-
     unsigned long timestamp = get_current_timestamp();
+    char *filepath = malloc(256);
 
-    size_t hash_size = SHA_DIGEST_LENGTH * 2;
-    size_t user_home_folder_size = strlen(user_home_folder);
-    size_t db_folder_name_size = strlen(db_folder_name);
-    size_t timestamp_size = 20;
-    size_t extension_size = strlen(".todo.md");
-
-    size_t total_size = user_home_folder_size + 1 + db_folder_name_size + 1 + hash_size + 1 + timestamp_size + extension_size + 1;
-    // user_home_folder_size'/'db_folder_name_size'/'hash_size'-'timestamp_size'.todo.md'\0
-    char *file_path = malloc(total_size);
-
-    snprintf(file_path, total_size, "%s/%s/%s-%lu.todo.md", user_home_folder, db_folder_name, hash, timestamp);
+    snprintf(filepath, 256, "%s/%s/%s-%lu%s", user_home_folder, db_folder_name, hash, timestamp, file_extension);
 
     free(hash);
 
-    return file_path;
+    return filepath;
 }
 
 void database_delete_file(Database_Db_File *file)

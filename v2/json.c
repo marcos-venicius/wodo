@@ -5,8 +5,7 @@
 #include "./clibs/arr.h"
 #include "./visualizer.h"
 #include "./database.h"
-
-static void print_scaped_string(wodo_string_t string);
+#include "./utils.h"
 
 void print_tasks_to_stdout_as_json(wodo_task_t *tasks) {
     printf("[");
@@ -21,7 +20,7 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks) {
         {
             printf("\"title\":{");
             printf("\"content\":");
-            print_scaped_string(task.title.as.title);
+            print_scaped_string_to_fd(task.title.as.title, stdout);
             printf(",");
             // location
             {
@@ -128,7 +127,7 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks) {
 
             printf("\"content\":");
 
-            print_scaped_string(task.description.as.description);
+            print_scaped_string_to_fd(task.description.as.description, stdout);
 
             // location
             if (task.description.location.col != 0) {
@@ -156,10 +155,10 @@ void print_database_files_to_stdout_as_json(Database *database) {
 
         printf("{");
         printf("\"name\":");
-        print_scaped_string((wodo_string_t){
+        print_scaped_string_to_fd((wodo_string_t){
             .length = strlen(it->name),
             .value = it->name
-        });
+        }, stdout);
         printf(",");
         printf("\"path\":\"%s\"", it->filepath);
         printf("}");
@@ -167,31 +166,3 @@ void print_database_files_to_stdout_as_json(Database *database) {
     printf("]\n");
 }
 
-static void print_scaped_string(wodo_string_t string) {
-    printf("\"");
-    size_t last_index = 0;
-
-    for (size_t i = 0; i < string.length; i++) {
-        switch (string.value[i]) {
-            case '"': {
-                printf("%.*s", (int)(i - last_index), string.value + last_index);
-                printf("\\\"");
-
-                // skip double quotes
-                last_index = i + 1;
-            } break;
-            case '\n': {
-                printf("%.*s", (int)(i - last_index), string.value + last_index);
-                printf("\\n");
-
-                // skip double quotes
-                last_index = i + 1;
-            } break;
-        }
-    }
-
-    if (last_index < string.length)
-        printf("%.*s", (int)(string.length - last_index), string.value + last_index);
-
-    printf("\"");
-}

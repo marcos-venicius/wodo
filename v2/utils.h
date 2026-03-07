@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <time.h>
 #include "./systemtypes.h"
 
@@ -16,5 +17,6 @@ SysDateTime get_today_date(void);
 time_t get_timestamp(SysDateTime sys_date_time);
 bool arg_cmp(const char *actual, const char *expected, const char *alternative);
 bool cmp_sized_strings(const char *a, const char *b, size_t len_a, size_t len_b);
+void print_scaped_string_to_fd(wodo_string_t string, FILE *file);
 
 #endif // _WODO_UTILS_H_
