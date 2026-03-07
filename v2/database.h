@@ -5,9 +5,6 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-#define LARGE_IDENTIFIER_SIZE 40
-#define SHORT_IDENTIFIER_SIZE 7
-
 #define DATABASE_OK_STATUS_CODE 0
 #define DATABASE_NOT_FOUND_STATUS_CODE 1
 #define DATABASE_CONFLICT_STATUS_CODE 2
