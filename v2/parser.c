@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include "./parser.h"
 #include "./clibs/arr.h"
+#include "./date.h"
 
 #define task_beginning_character_descriptor '%'
 #define property_beginning_character_descriptor '.'
@@ -93,7 +94,7 @@ static inline bool str_slice_eq(const char *slice, size_t slice_len, const char 
     return strncmp(slice, str, str_len) == 0;
 }
 
-static wodo_task_state_t parse_task_state(void) {
+static wodo_task_state_t parse_task_state_property(void) {
     // skip whitespaces
     while (!is_empty() && is_whitespace(chr())) advance_cursor();
 
@@ -119,7 +120,7 @@ static wodo_task_state_t parse_task_state(void) {
     return -1;
 }
 
-static wodo_string_t *parse_task_tags(void) {
+static wodo_string_t *parse_task_tags_property(void) {
     // skip white spaces
     while (!is_empty() && is_whitespace(chr())) advance_cursor();
 
@@ -170,7 +171,7 @@ static int parse_fixed_size_number_and_convert_to_int(int size) {
     return n;
 }
 
-static wodo_datetime_t parse_task_date(void) {
+static wodo_datetime_t parse_task_date_property(void) {
     // skip whitespaces
     while (!is_empty() && is_whitespace(chr())) advance_cursor();
 
@@ -229,7 +230,7 @@ static wodo_datetime_t parse_task_date(void) {
     tz_offset_minutes += tz_offset_hours * 60;
     tz_offset_minutes = tz_offset_minutes * multiplier;
 
-    return (wodo_datetime_t){
+    wodo_datetime_t datetime = {
         .year = year,
         .month = month,
         .day = day,
@@ -238,6 +239,11 @@ static wodo_datetime_t parse_task_date(void) {
         .second = second,
         .tz_offset = tz_offset_minutes
     };
+
+    if (!validate_datetime(datetime))
+        parser_error("couldn't parse 'date' property correctly because the datetime informed is invalid");
+
+    return datetime;
 }
 
 static wodo_task_t parse_task() {
@@ -289,13 +295,13 @@ static wodo_task_t parse_task() {
         size_t s_property_size = cursor - bot;
 
         if (str_slice_eq(s_property_name, s_property_size, "state")) {
-            wodo_task_state_t state = parse_task_state();
+            wodo_task_state_t state = parse_task_state_property();
 
             task.state = state;
         } else if (str_slice_eq(s_property_name, s_property_size, "tags")) {
-            task.tags = parse_task_tags();
+            task.tags = parse_task_tags_property();
         } else if (str_slice_eq(s_property_name, s_property_size, "date")) {
-            task.created_at = parse_task_date();
+            task.created_at = parse_task_date_property();
         } else {
             parser_error("invalid property name '%.*s'\n", (int)s_property_size, s_property_name);
         }

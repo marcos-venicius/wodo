@@ -14,17 +14,20 @@ endif
 
 all: directories $(OUTPUT_FOLDER)/wodo
 
-$(OUTPUT_FOLDER)/wodo: wodo.o parser.o io.o
+$(OUTPUT_FOLDER)/wodo: wodo.o parser.o io.o date.o
 	$(CXX) $(CXX_FLAGS) $(OPENSSL_FLAGS) $(BUILD_FLAGS) -o $(OUTPUT_FOLDER)/wodo $^
 
-wodo.o: wodo.c parser.h parser.c ./clibs/arr.h io.h io.c
+wodo.o: wodo.c parser.h parser.c ./clibs/arr.h io.h io.c systemtypes.h
 	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c wodo.c -o wodo.o
 
-parser.o: parser.c parser.h ./clibs/arr.h
+parser.o: parser.c parser.h systemtypes.h date.h date.c
 	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c parser.c -o parser.o
 
 io.o: io.c io.h
 	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c io.c -o io.o
+
+date.o: date.c date.h
+	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c date.c -o date.o
 
 directories: $(OUTPUT_FOLDER)
 
