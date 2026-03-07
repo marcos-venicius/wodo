@@ -8,7 +8,7 @@
 #include "./date.h"
 #include "./clibs/arr.h"
 
-static void print_wodo_datetime(wodo_datetime_t timezoned_datetime, bool simple)
+void print_wodo_datetime(wodo_datetime_t timezoned_datetime, bool simple)
 {
     wodo_datetime_t datetime = convert_to_local(timezoned_datetime);
 
@@ -66,11 +66,11 @@ static void print_wodo_task_state(wodo_task_state_t state) {
     }
 }
 
-static void print_wodo_task_tags(wodo_string_t *tags) {
+static void print_wodo_task_tags(wodo_node_t *tags) {
     printf("[");
     for (size_t i = 0; i < cl_arr_len(tags); i++) {
         if (i > 0) printf(", ");
-        printf("%.*s", (int)tags[i].length, tags[i].value);
+        printf("%.*s", (int)tags[i].as.tag.length, tags[i].as.tag.value);
     }
     printf("]");
 }
@@ -157,11 +157,11 @@ void print_wrapped_normalized(wodo_string_t s)
 
 void visualize_task(wodo_task_t task, bool full) {
     if (!full) {
-        print_wodo_datetime(task.created_at, true);
+        print_wodo_datetime(task.date_property.as.date_property, true);
         printf(" ");
     }
 
-    switch (task.state) {
+    switch (task.state_property.as.state_property) {
         case Wodo_Task_State_Todo:
             printf("\033[0;33m");
             break;
@@ -177,25 +177,25 @@ void visualize_task(wodo_task_t task, bool full) {
         default:
             assert(0 && "unimplemented task state visualizer");
     }
-    printf("%% %.*s\033[0m", (int)task.title.length, task.title.value);
+    printf("%% %.*s\033[0m", (int)task.title.as.title.length, task.title.as.title.value);
     if (full) {
         printf("\n\n");
         printf(".state ");
-        print_wodo_task_state(task.state);
+        print_wodo_task_state(task.state_property.as.state_property);
         printf("\n");
-        if (cl_arr_len(task.tags) > 0) {
+        if (cl_arr_len(task.tags_property.as.tags_property) > 0) {
             printf(".tags  ");
-            print_wodo_task_tags(task.tags);
+            print_wodo_task_tags(task.tags_property.as.tags_property);
             printf("\n");
         }
         printf(".date  ");
-        print_wodo_datetime(task.created_at, false);
+        print_wodo_datetime(task.date_property.as.date_property, false);
         printf("\n");
-        print_wrapped_normalized(task.description);
+        print_wrapped_normalized(task.description.as.description);
     } else {
-        if (cl_arr_len(task.tags) > 0) {
+        if (cl_arr_len(task.tags_property.as.tags_property) > 0) {
             printf(" ");
-            print_wodo_task_tags(task.tags);
+            print_wodo_task_tags(task.tags_property.as.tags_property);
         }
 
         printf("\n");

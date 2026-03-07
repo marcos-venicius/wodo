@@ -14,10 +14,10 @@ endif
 
 all: directories $(OUTPUT_FOLDER)/wodo
 
-$(OUTPUT_FOLDER)/wodo: wodo.o parser.o io.o date.o visualizer.o
+$(OUTPUT_FOLDER)/wodo: wodo.o parser.o io.o date.o visualizer.o json.o
 	$(CXX) $(CXX_FLAGS) $(OPENSSL_FLAGS) $(BUILD_FLAGS) -lm -o $(OUTPUT_FOLDER)/wodo $^
 
-wodo.o: wodo.c parser.h parser.c ./clibs/arr.h io.h io.c systemtypes.h visualizer.h
+wodo.o: wodo.c parser.h parser.c ./clibs/arr.h io.h io.c systemtypes.h json.h json.c
 	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c wodo.c -o wodo.o
 
 parser.o: parser.c parser.h systemtypes.h date.h date.c
@@ -31,6 +31,9 @@ date.o: date.c date.h
 
 visualizer.o: visualizer.c visualizer.h
 	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c visualizer.c -o visualizer.o
+
+json.o: json.c json.h visualizer.c visualizer.h
+	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c json.c -o json.o
 
 directories: $(OUTPUT_FOLDER)
 

@@ -46,10 +46,12 @@ typedef struct {
 
 #define cl_arr_len(arr) ((arr) ? ((CL_ArrayHeader*)(arr) - 1)->count : 0)
 
-#define cl_arr_free(arr)                \
-    do {                                \
-        free((CL_ArrayHeader*)arr - 1); \
-        arr = CL_ARRAY_INIT;            \
+#define cl_arr_free(arr)                    \
+    do {                                    \
+        if (arr != CL_ARRAY_INIT) {         \
+            free((CL_ArrayHeader*)arr - 1); \
+            arr = CL_ARRAY_INIT;            \
+        }                                   \
     } while(0)
 
 inline void *cl_arr_pop_impl(void *arr, size_t element_size) {

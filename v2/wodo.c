@@ -4,8 +4,7 @@
 #include "./io.h"
 #include "./parser.h"
 #include "./clibs/arr.h"
-#include "./visualizer.h"
-
+#include "./json.h"
 
 int main() {
     char *content = NULL;
@@ -16,12 +15,9 @@ int main() {
 
     wodo_task_t *tasks = parse_tasks(filename, content, length);
 
-    for (size_t i = 0; i < cl_arr_len(tasks); ++i) {
-        if (i > 0) printf("\n");
-        wodo_task_t task = tasks[i];
+    print_tasks_to_stdout_as_json(tasks);
 
-        visualize_task(task, false);
-    }
+    cl_arr_free(tasks);
 
     return 0;
 }
