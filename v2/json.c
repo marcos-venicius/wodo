@@ -1,8 +1,10 @@
 #define CL_ARRAY_IMPLEMENTATION
+#include <string.h>
 #include <stdio.h>
 #include "./json.h"
 #include "./clibs/arr.h"
 #include "./visualizer.h"
+#include "./database.h"
 
 static void print_scaped_string(wodo_string_t string);
 
@@ -142,6 +144,26 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks) {
 
         printf("}");
     }
+    printf("]\n");
+}
+
+void print_database_files_to_stdout_as_json(Database *database) {
+    printf("[");
+    for (size_t i = 0; i < cl_arr_len(database->files); i++) {
+        if (i > 0) printf(",");
+
+        Database_Db_File *it = database->files[i];
+
+        printf("{");
+        printf("\"name\":");
+        print_scaped_string((wodo_string_t){
+            .length = strlen(it->name),
+            .value = it->name
+        });
+        printf(",");
+        printf("\"path\":\"%s\"", it->filepath);
+        printf("}");
+    };
     printf("]\n");
 }
 
