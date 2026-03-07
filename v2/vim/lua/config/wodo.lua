@@ -263,6 +263,11 @@ local function task_picker()
     end
   end
 
+  if #tasks == 0 then
+    vim.notify("There is not task to list", vim.log.levels.INFO)
+    return
+  end
+
   pickers.new({}, {
     prompt_title = "Tasks",
     finder = finders.new_table({
@@ -339,6 +344,11 @@ local function telescope_list_tasks()
       vim.schedule(function()
         vim.notify("Invalid JSON from wodo", vim.log.levels.ERROR)
       end)
+      return
+    end
+
+    if #data == 0 then
+      vim.notify("There is not task to list", vim.log.levels.INFO)
       return
     end
 
