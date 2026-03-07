@@ -1,8 +1,10 @@
-% Basic title
+% Title
 
-.state done
-.tags  frontend testing
+.state todo
 .date  2026-02-28 21:56:11-14:00
+.tags
+
+Description
 
 % Second title
 
@@ -45,3 +47,4 @@ After the properties, every line that does not starts with '%' is the descriptio
 % Hello world
 
 .date  2026-03-05 21:56:11-03:00
+
