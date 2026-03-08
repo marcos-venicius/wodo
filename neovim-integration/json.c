@@ -9,7 +9,7 @@
 #include "./io.h"
 #include "./parser.h"
 
-void print_tasks_to_stdout_as_json(wodo_task_t *tasks) {
+void print_tasks_to_stdout_as_json(wodo_task_t *tasks, bool breakLine) {
     printf("[");
     for (size_t i = 0; i < cl_arr_len(tasks); i++) {
         // separate objects
@@ -145,7 +145,8 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks) {
 
         printf("}");
     }
-    printf("]\n");
+    printf("]");
+    if (breakLine) printf("\n");
 }
 
 void print_database_files_to_stdout_as_json(Database *database) {
@@ -190,9 +191,6 @@ void print_database_files_to_stdout_as_json(Database *database) {
             total_count++;
         }
 
-        free(content);
-        cl_arr_free(tasks);
-
         printf("{");
         printf("\"name\":");
         print_scaped_string_to_fd((wodo_string_t){
@@ -202,16 +200,24 @@ void print_database_files_to_stdout_as_json(Database *database) {
         printf(",");
         printf("\"path\":\"%s\"", it->filepath);
         printf(",");
-        printf("\"states\": {");
         {
+            printf("\"states\": {");
             printf("\"total\":%d,", total_count);
             printf("\"todo\":%d,", todo_count);
             printf("\"doing\":%d,", doing_count);
             printf("\"blocked\":%d,", blocked_count);
             printf("\"done\":%d", done_count);
+            printf("}");
+        }
+        printf(",");
+        {
+            printf("\"tasks\":");
+            print_tasks_to_stdout_as_json(tasks, false);
         }
         printf("}");
-        printf("}");
+
+        free(content);
+        cl_arr_free(tasks);
     };
     printf("]\n");
 }

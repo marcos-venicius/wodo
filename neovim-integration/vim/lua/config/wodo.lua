@@ -247,54 +247,100 @@ local function task_picker()
   local conf = require("telescope.config").values
   local actions = require("telescope.actions")
   local action_state = require("telescope.actions.state")
+  local entry_display = require("telescope.pickers.entry_display")
+  local previewers = require("telescope.previewers")
 
-  local buf = vim.api.nvim_get_current_buf()
-  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local path = vim.api.nvim_buf_get_name(0)
 
-  local tasks = {}
+  vim.system({ "wodo", "p", path }, { text = true }, function(result)
+    local ok, data = pcall(vim.json.decode, result.stdout)
+    if not ok then return end
 
-  for i, line in ipairs(lines) do
-    if line:match("^%%") then
-      local title = line:gsub("^%% ?", "")
+    local tasks = {}
+
+    for _, task in ipairs(data) do
       table.insert(tasks, {
-        line = i,
-        display = title,
+        title = task.title.content,
+        state = task.state.content,
+        description = task.description.content,
+        line = task.title.location.line,
       })
     end
-  end
 
-  if #tasks == 0 then
-    vim.notify("There is not task to list", vim.log.levels.INFO)
-    return
-  end
+    vim.schedule(function()
 
-  pickers.new({}, {
-    prompt_title = "Tasks",
-    finder = finders.new_table({
-      results = tasks,
-      entry_maker = function(entry)
-        return {
-          value = entry,
-          display = entry.display,
-          ordinal = entry.display,
-          line = entry.line,
-        }
-      end,
-    }),
+      local displayer = entry_display.create({
+        separator = " ",
+        items = {
+          { width = 10 },
+          { remaining = true },
+        },
+      })
 
-    sorter = conf.generic_sorter({}),
+      local function make_display(entry)
+        local hl = "Normal"
 
-    attach_mappings = function(_, map)
-      actions.select_default:replace(function(prompt_bufnr)
-        local selection = action_state.get_selected_entry()
-        actions.close(prompt_bufnr)
+        if entry.state == "todo" then hl = "wodoStateTodo" end
+        if entry.state == "doing" then hl = "wodoStateDoing" end
+        if entry.state == "done" then hl = "wodoStateDone" end
+        if entry.state == "blocked" then hl = "wodoStateBlocked" end
 
-        vim.api.nvim_win_set_cursor(0, { selection.line, 0 })
-      end)
+        return displayer({
+          { entry.state, hl },
+          entry.title,
+        })
+      end
 
-      return true
-    end,
-  }):find()
+      pickers.new({}, {
+        prompt_title = "Tasks",
+
+        finder = finders.new_table({
+          results = tasks,
+          entry_maker = function(entry)
+            return {
+              value = entry,
+              ordinal = entry.title,
+              display = make_display,
+              state = entry.state,
+              title = entry.title,
+              description = entry.description,
+              line = entry.line,
+            }
+          end,
+        }),
+
+        sorter = conf.generic_sorter({}),
+
+        previewer = previewers.new_buffer_previewer({
+          title = "Description",
+
+          define_preview = function(self, entry)
+            local desc = entry.value.description or ""
+            local lines = vim.split(desc, "\n")
+
+            local bufnr = self.state.bufnr
+
+            vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+
+            -- render markdown
+            vim.bo[bufnr].filetype = "wodo"
+          end,
+        }),
+
+        attach_mappings = function(_, _)
+          actions.select_default:replace(function(prompt_bufnr)
+            local selection = action_state.get_selected_entry()
+            actions.close(prompt_bufnr)
+
+            vim.api.nvim_win_set_cursor(0, { selection.line, 0 })
+          end)
+
+          return true
+        end,
+      }):find()
+
+    end)
+  end)
 end
 
 local function create_tasks_file()
@@ -330,6 +376,7 @@ local function telescope_list_tasks()
   local conf = require("telescope.config").values
   local actions = require("telescope.actions")
   local action_state = require("telescope.actions.state")
+  local previewers = require("telescope.previewers")
 
   vim.system({ "wodo", "l" }, { text = true }, function(result)
     if result.code ~= 0 then
@@ -363,12 +410,50 @@ local function telescope_list_tasks()
             return {
               value = item,
               ordinal = item.name,
-              display = "[total " .. item.states.total .. "]" .. " [todo " .. item.states.todo .. "]" .. " [doing " .. item.states.doing .. "]" .. " [blocked " .. item.states.blocked .. "]" .. " [done " .. item.states.done .. "] - " .. item.name,
+              display = item.name,
             }
           end,
         }),
 
         sorter = conf.generic_sorter({}),
+
+        previewer = previewers.new_buffer_previewer({
+          title = "Tasks",
+
+          define_preview = function(self, entry)
+            local tasks = entry.value.tasks or {}
+            local bufnr = self.state.bufnr
+
+            vim.bo[bufnr].modifiable = true
+
+            local lines = {}
+
+            for _, task in ipairs(tasks) do
+              local state = task.state.content
+              local date = task.date.content
+              local title = task.title.content
+
+              table.insert(lines, string.format("%-8s %-20s %s", state, date, title))
+            end
+
+            vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+
+            -- Apply highlight to state column
+            for i, task in ipairs(tasks) do
+              local state = task.state.content
+              local hl = "Normal"
+
+              if state == "todo" then hl = "wodoStateTodo" end
+              if state == "doing" then hl = "wodoStateDoing" end
+              if state == "done" then hl = "wodoStateDone" end
+              if state == "blocked" then hl = "wodoStateBlocked" end
+
+              vim.api.nvim_buf_add_highlight(bufnr, -1, hl, i - 1, 0, #state)
+            end
+
+            vim.bo[bufnr].modifiable = false
+          end,
+        }),
 
         attach_mappings = function(prompt_bufnr)
           actions.select_default:replace(function()
@@ -473,3 +558,8 @@ vim.api.nvim_create_autocmd("BufEnter", {
     vim.keymap.set("n", "<leader>wL", telescope_list_tasks)
   end
 })
+
+vim.api.nvim_set_hl(0, "wodoStateTodo", { fg = "#ffb86c" })
+vim.api.nvim_set_hl(0, "wodoStateDoing", { fg = "#8be9fd" })
+vim.api.nvim_set_hl(0, "wodoStateDone", { fg = "#50fa7b" })
+vim.api.nvim_set_hl(0, "wodoStateBlocked", { fg = "#ff5555" })
