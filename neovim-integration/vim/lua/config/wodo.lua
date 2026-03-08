@@ -446,6 +446,10 @@ vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
   group = group,
   pattern = { "*.wodo" },
   callback = function()
+    vim.opt_local.filetype = 'wodo'
+    vim.opt_local.conceallevel = 2
+    vim.opt_local.concealcursor = 'nc'
+
     vim.keymap.set("n", "<leader>wn", create_task_boilerplate)
     vim.keymap.set("n", "<leader>wt", function() set_task_state("todo") end)
     vim.keymap.set("n", "<leader>wi", function() set_task_state("doing") end)
