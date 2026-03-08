@@ -14,10 +14,10 @@ endif
 
 all: directories $(OUTPUT_FOLDER)/wodo
 
-$(OUTPUT_FOLDER)/wodo: wodo.o parser.o io.o date.o visualizer.o json.o database.o conf.o utils.o crypt.o
+$(OUTPUT_FOLDER)/wodo: wodo.o parser.o io.o date.o visualizer.o json.o database.o utils.o crypt.o argparser.o
 	$(CXX) $(CXX_FLAGS) $(OPENSSL_FLAGS) $(BUILD_FLAGS) -lm -o $(OUTPUT_FOLDER)/wodo $^
 
-wodo.o: wodo.c parser.h parser.c ./clibs/arr.h io.h io.c systemtypes.h json.h json.c
+wodo.o: wodo.c parser.h parser.c ./clibs/arr.h io.h io.c systemtypes.h json.h json.c argparser.h argparser.c
 	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c wodo.c -o wodo.o
 
 parser.o: parser.c parser.h systemtypes.h date.h date.c
@@ -41,11 +41,11 @@ utils.o: utils.c utils.h
 database.o: database.c database.h utils.c utils.h
 	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c database.c -o database.o
 
-conf.o: conf.c conf.h
-	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c conf.c -o conf.o
-
 crypt.o: crypt.c crypt.h
 	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c crypt.c -o crypt.o
+
+argparser.o: argparser.c argparser.h clibs/arr.h utils.h utils.c
+	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c argparser.c -o argparser.o
 
 directories: $(OUTPUT_FOLDER)
 

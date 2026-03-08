@@ -65,26 +65,5 @@ typedef struct {
     int day, month, year, hour, minute;
 } SysDateTime;
 
-typedef enum {
-    AK_ADD = 1,
-    AK_ADD_PATH,
-    AK_REMOVE,
-    AK_PARSE_AS_JSON,
-    AK_LIST,
-} ArgumentKind;
-
-typedef struct {
-    char **tag_filter; // CL_ARRAY_INIT
-    char **state_filter; // CL_ARRAY_INIT
-} Flags;
-
-typedef struct {
-    ArgumentKind kind;
-    char *arg1;
-    char *arg2;
-
-    Flags flags;
-} Arguments;
-
 #endif // !_WODO_SYSTEMTYPES_H_
 
