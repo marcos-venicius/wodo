@@ -361,9 +361,9 @@ local function telescope_list_tasks()
 
           entry_maker = function(item)
             return {
-              value = item,                 -- store full object
-              ordinal = item.name,          -- used for sorting/search
-              display = item.name,          -- what Telescope shows
+              value = item,
+              ordinal = item.name,
+              display = "[total " .. item.states.total .. "]" .. " [todo " .. item.states.todo .. "]" .. " [doing " .. item.states.doing .. "]" .. " [blocked " .. item.states.blocked .. "]" .. " [done " .. item.states.done .. "] - " .. item.name,
             }
           end,
         }),

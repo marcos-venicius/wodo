@@ -24,24 +24,30 @@ typedef struct {
 #ifdef CL_ARRAY_IMPLEMENTATION
 #include <stdlib.h>
 
-#define cl_arr_push(arr, v)                                                                         \
-    do                                                                                              \
-    {                                                                                               \
-        CL_ArrayHeader *header;                                                                     \
-        if ((arr) == CL_ARRAY_INIT) {                                                               \
-            header = malloc(sizeof(*(arr)) * CL_ARRAY_INIT_CAPACITY + sizeof(CL_ArrayHeader));      \
-            header->count = 0;                                                                      \
-            header->capacity = CL_ARRAY_INIT_CAPACITY;                                              \
-            (arr) = (void*)(header + 1);                                                            \
-        } else {                                                                                    \
-            header = (CL_ArrayHeader*)(arr) - 1;                                                    \
-        }                                                                                           \
-        if (header->count >= header->capacity) {                                                    \
-            header->capacity *= 1.5;                                                                \
-            header = realloc(header, sizeof(*(arr)) * header->capacity + sizeof(CL_ArrayHeader));   \
-            (arr) = (void*)(header + 1);                                                            \
-        }                                                                                           \
-        (arr)[header->count++] = (v);                                                               \
+#define cl_arr_push(arr, v)                                                                 \
+    do {                                                                                    \
+        CL_ArrayHeader *header;                                                             \
+        if ((arr) == CL_ARRAY_INIT) {                                                       \
+            size_t amt = sizeof(*(arr)) * CL_ARRAY_INIT_CAPACITY + sizeof(CL_ArrayHeader);  \
+            header = malloc(amt);                                                           \
+            header->count = 0;                                                              \
+            header->capacity = CL_ARRAY_INIT_CAPACITY;                                      \
+            (arr) = (void*)(header + 1);                                                    \
+        } else {                                                                            \
+            header = (CL_ArrayHeader*)(arr) - 1;                                            \
+        }                                                                                   \
+                                                                                            \
+        if (header->count >= header->capacity) {                                            \
+            size_t new_cap = (header->capacity * 3) / 2 + 1;                                \
+            size_t new_size = sizeof(*(arr)) * new_cap + sizeof(CL_ArrayHeader);            \
+            CL_ArrayHeader *tmp = realloc(header, new_size);                                \
+            if (tmp) {                                                                      \
+                header = tmp;                                                               \
+                header->capacity = new_cap;                                                 \
+                (arr) = (void*)(header + 1);                                                \
+            }                                                                               \
+        }                                                                                   \
+        (arr)[header->count++] = (v);                                                       \
     } while (0)
 
 #define cl_arr_len(arr) ((arr) ? ((CL_ArrayHeader*)(arr) - 1)->count : 0)

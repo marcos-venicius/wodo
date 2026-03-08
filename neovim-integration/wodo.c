@@ -51,11 +51,13 @@ static int add_path_action(const char *name, const char *filepath) {
 
     size_t content_size = read_from_file(abs_path, &content);
 
+    reset_parser_state();
+
     wodo_task_t *tasks = parse_tasks(filepath, content, content_size);
 
+    free(content);
     cl_arr_free(tasks);
 
-    free(content);
     database_save(&global_database);
 
     return 0;
@@ -122,10 +124,13 @@ static int parse_as_json_action(const char *filepath, Flags flags) {
 
     size_t length = read_from_file(filepath, &content);
 
+    reset_parser_state();
+
     wodo_task_t *tasks = parse_tasks(filepath, content, length);
 
     print_tasks_to_stdout_as_json(tasks);
 
+    free(content);
     cl_arr_free(tasks);
 
     return 0;

@@ -17,10 +17,10 @@ static size_t       cursor = 0;
 static size_t       bot = 0;
 static int          line = 1;
 static int          col = 1;
-static const char   *content = NULL;
+static char         *content = NULL;
 static size_t       content_length = 0;
-static const char   *filename;
 static wodo_task_t  *tasks = CL_ARRAY_INIT;
+static const char   *filename;
 
 static struct {
     int length;
@@ -278,6 +278,10 @@ static wodo_datetime_t parse_task_date_property(void) {
 static wodo_task_t parse_task() {
     wodo_task_t task = {0};
 
+    bool parsed_tags_property = false;
+    bool parsed_date_property = false;
+    bool parsed_state_property = false;
+
     // skip 'task_beginning_character_descriptor'
     advance_cursor(); 
 
@@ -327,6 +331,7 @@ static wodo_task_t parse_task() {
         if (str_slice_eq(s_property_name, s_property_size, "state")) {
             wodo_task_state_t state = parse_task_state_property();
 
+            parsed_state_property = true;
             task.state_property = (wodo_node_t){
                 .kind = wodo_node_kind_state_property,
                 .location = pop_location_snapshot(),
@@ -335,6 +340,7 @@ static wodo_task_t parse_task() {
         } else if (str_slice_eq(s_property_name, s_property_size, "tags")) {
             wodo_node_t *tags = parse_task_tags_property();
 
+            parsed_tags_property = true;
             task.tags_property = (wodo_node_t){
                 .location = pop_location_snapshot(),
                 .kind = wodo_node_kind_tags_property,
@@ -343,6 +349,7 @@ static wodo_task_t parse_task() {
         } else if (str_slice_eq(s_property_name, s_property_size, "date")) {
             wodo_datetime_t date = parse_task_date_property();
 
+            parsed_date_property = true;
             task.date_property = (wodo_node_t){
                 .location = pop_location_snapshot(),
                 .kind = wodo_node_kind_date_property,
@@ -355,6 +362,23 @@ static wodo_task_t parse_task() {
         // skip empty lines and white spaces
         while (!is_empty() && (is_whitespace(chr()) || is_linebreak(chr()))) advance_cursor();
     }
+
+    if (!parsed_date_property) 
+        parser_error("starting task description before defining required property 'date'");
+
+    if (!parsed_state_property) 
+        task.state_property = (wodo_node_t){
+            .location = {0},
+            .kind = wodo_node_kind_state_property,
+            .as.state_property = Wodo_Task_State_Todo,
+        };
+
+    if (!parsed_tags_property)
+        task.tags_property = (wodo_node_t){
+            .location = {0},
+            .kind = wodo_node_kind_tags_property,
+            .as.tags_property = CL_ARRAY_INIT
+        };
 
     bot = cursor;
 
@@ -406,7 +430,7 @@ static wodo_task_t parse_task() {
  */
 wodo_task_t *parse_tasks(const char *content_filename, const char *file_content, size_t length) {
     filename = content_filename;
-    content = file_content;
+    content = (char*)file_content;
     content_length = length;
 
     while (!is_empty()) {
@@ -427,4 +451,16 @@ wodo_task_t *parse_tasks(const char *content_filename, const char *file_content,
     }
 
     return tasks;
+}
+
+void reset_parser_state(void) {
+    cursor = 0;
+    bot = 0;
+    line = 1;
+    col = 1;
+    content = NULL;
+    content_length = 0;
+    filename = NULL;
+    tasks = CL_ARRAY_INIT;
+    location_snapshots.length = 0;
 }

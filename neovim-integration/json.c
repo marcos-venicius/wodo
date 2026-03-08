@@ -6,6 +6,8 @@
 #include "./visualizer.h"
 #include "./database.h"
 #include "./utils.h"
+#include "./io.h"
+#include "./parser.h"
 
 void print_tasks_to_stdout_as_json(wodo_task_t *tasks) {
     printf("[");
@@ -147,11 +149,49 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks) {
 }
 
 void print_database_files_to_stdout_as_json(Database *database) {
+    int total_count = 0;
+    int todo_count = 0;
+    int doing_count = 0;
+    int blocked_count = 0;
+    int done_count = 0;
+
     printf("[");
     for (size_t i = 0; i < cl_arr_len(database->files); i++) {
         if (i > 0) printf(",");
 
         Database_Db_File *it = database->files[i];
+
+        char *content;
+
+        size_t length = read_from_file(it->filepath, &content);
+
+        reset_parser_state();
+
+        wodo_task_t *tasks = parse_tasks(it->filepath, content, length);
+
+        for (size_t i = 0; i < cl_arr_len(tasks); i++) {
+            wodo_task_t task = tasks[i];
+
+            switch (task.state_property.as.state_property) {
+                case Wodo_Task_State_Todo:
+                    todo_count++;
+                    break;
+                case Wodo_Task_State_Doing:
+                    doing_count++;
+                    break;
+                case Wodo_Task_State_Blocked:
+                    blocked_count++;
+                    break;
+                case Wodo_Task_State_Done:
+                    done_count++;
+                    break;
+                default: assert(0 && "unhandled wodo state during files listing");
+            }
+            total_count++;
+        }
+
+        free(content);
+        cl_arr_free(tasks);
 
         printf("{");
         printf("\"name\":");
@@ -161,6 +201,16 @@ void print_database_files_to_stdout_as_json(Database *database) {
         }, stdout);
         printf(",");
         printf("\"path\":\"%s\"", it->filepath);
+        printf(",");
+        printf("\"states\": {");
+        {
+            printf("\"total\":%d,", total_count);
+            printf("\"todo\":%d,", todo_count);
+            printf("\"doing\":%d,", doing_count);
+            printf("\"blocked\":%d,", blocked_count);
+            printf("\"done\":%d", done_count);
+        }
+        printf("}");
         printf("}");
     };
     printf("]\n");
