@@ -8,6 +8,8 @@ OUTPUT_FOLDER = ./bin
 ifeq ($(BUILD), 1)
 	BUILD_FLAGS = -O3 -march=native -flto -fPIE -pie -fno-semantic-interposition -fvisibility=hidden
 	DEBUG_FLAGS = 
+else
+	CXX_FLAGS += -DDEV_MODE="1"
 endif
 
 .PHONY: directories

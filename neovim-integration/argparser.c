@@ -111,6 +111,10 @@ error:
 void usage(FILE *stream, const char *program_name, char *error_message, ...) {
     va_list args;
 
+#ifdef DEV_MODE
+    printf("DEVMODE\n");
+#endif
+
     fprintf(stream, "%s [action] [arguments?] [flags?]\n", program_name);
     fprintf(stream, "\n");
     fprintf(stream, "Actions:\n");
