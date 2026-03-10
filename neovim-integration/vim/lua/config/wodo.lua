@@ -462,6 +462,7 @@ local function telescope_list_tasks()
 
             local path = entry.value.path
             vim.cmd({ cmd = "edit", args = { path } })
+            vim.api.nvim_set_option_value("winbar", "  %= " .. entry.value.name .. " %=", { scope = "local" })
           end)
 
           return true
