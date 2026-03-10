@@ -6,6 +6,9 @@
 
 #define defer(code) do { return_code = code; goto end; } while (0)
 
+/*
+ * I have an extern inside "database.h" file.
+ **/
 Database global_database = {0};
 
 int main(int argc, char **argv) {
