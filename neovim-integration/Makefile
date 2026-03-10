@@ -14,10 +14,10 @@ endif
 
 all: directories $(OUTPUT_FOLDER)/wodo
 
-$(OUTPUT_FOLDER)/wodo: wodo.o parser.o io.o date.o visualizer.o json.o database.o utils.o crypt.o argparser.o
+$(OUTPUT_FOLDER)/wodo: wodo.o parser.o io.o date.o visualizer.o json.o database.o utils.o crypt.o argparser.o actions.o
 	$(CXX) $(CXX_FLAGS) $(OPENSSL_FLAGS) $(BUILD_FLAGS) -lm -o $(OUTPUT_FOLDER)/wodo $^
 
-wodo.o: wodo.c parser.h parser.c ./clibs/arr.h io.h io.c systemtypes.h json.h json.c argparser.h argparser.c
+wodo.o: wodo.c parser.h parser.c ./clibs/arr.h io.h io.c systemtypes.h json.h json.c argparser.h argparser.c actions.c actions.h
 	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c wodo.c -o wodo.o
 
 parser.o: parser.c parser.h systemtypes.h date.h date.c
@@ -46,6 +46,9 @@ crypt.o: crypt.c crypt.h
 
 argparser.o: argparser.c argparser.h clibs/arr.h utils.h utils.c
 	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c argparser.c -o argparser.o
+
+actions.o: actions.c actions.h clibs/arr.h utils.h utils.c
+	$(CXX) $(CXX_FLAGS) $(DEBUG_FLAGS) -c actions.c -o actions.o
 
 directories: $(OUTPUT_FOLDER)
 

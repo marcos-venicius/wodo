@@ -23,6 +23,13 @@ typedef struct {
 
 typedef uint8_t database_status_code_t;
 
+/*
+Global database variable.
+
+It's going to be the first thing that is loaded in the main function
+**/
+extern Database global_database;
+
 // TODO: maybe in the future, do not load the entire database in memory
 database_status_code_t database_load(Database *out);
 void database_save(Database *database);
