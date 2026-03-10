@@ -13,20 +13,22 @@ static char *shift(int *argc, char ***argv) {
     return *((*argv)++);
 }
 
+#define getarg() shift(&argc, &argv)
+
 Arguments *parse_arguments(int argc, char **argv) {
     Arguments *args = calloc(sizeof(Arguments), 1);
 
     char *arg;
 
-    args->program_name = shift(&argc, &argv);
+    args->program_name = getarg();
 
-    while ((arg = shift(&argc, &argv)) != NULL) {
+    while ((arg = getarg()) != NULL) {
         if (arg_cmp(arg, "help", "h")) {
             usage(stdout, args->program_name, NULL);
 
             goto error;
         } else if (arg_cmp(arg, "add", "a")) {
-            char *arg1 = shift(&argc, &argv);
+            char *arg1 = getarg();
 
             if (arg1 == NULL) {
                 usage(stderr, args->program_name, "action \"%s\" at least a title", arg);
@@ -34,7 +36,7 @@ Arguments *parse_arguments(int argc, char **argv) {
                 goto error;
             }
 
-            char *arg2 = shift(&argc, &argv);
+            char *arg2 = getarg();
 
             if (arg2 == NULL) {
                 args->kind = AK_ADD;
@@ -45,7 +47,7 @@ Arguments *parse_arguments(int argc, char **argv) {
                 args->arg2 = arg2;
             }
         } else if (arg_cmp(arg, "remove", "r")) {
-            char *value = shift(&argc, &argv);
+            char *value = getarg();
 
             if (value == NULL) {
                 usage(stderr, args->program_name, "action \"%s\" expects an id. you don't have any selected files", arg);
@@ -58,7 +60,7 @@ Arguments *parse_arguments(int argc, char **argv) {
         } else if (arg_cmp(arg, "parse-as-json", "p")) {
             args->kind = AK_PARSE_AS_JSON;
 
-            char *value = shift(&argc, &argv);
+            char *value = getarg();
 
             if (value == NULL) {
                 usage(stderr, args->program_name, "action \"%s\" expects a value.", arg);
@@ -69,8 +71,19 @@ Arguments *parse_arguments(int argc, char **argv) {
             args->arg1 = value;
         } else if (arg_cmp(arg, "list", "l")) {
             args->kind = AK_LIST;
+        } else if (arg_cmp(arg, "format", "f")) {
+            char *value = getarg();
+
+            if (value == NULL) {
+                usage(stderr, args->program_name, "action \"%s\" expects a value.", arg);
+
+                goto error;
+            }
+
+            args->kind = AK_FORMAT;
+            args->arg1 = value;
         } else if (arg_cmp(arg, "--filter-tag", "-ft")) {
-            char *value = shift(&argc, &argv);
+            char *value = getarg();
 
             if (value == NULL) {
                 usage(stderr, args->program_name, "action \"%s\" expects a value.", arg);
@@ -80,7 +93,7 @@ Arguments *parse_arguments(int argc, char **argv) {
 
             cl_arr_push(args->flags.tag_filter, value);
         } else if (arg_cmp(arg, "--filter-state", "-fs")) {
-            char *value = shift(&argc, &argv);
+            char *value = getarg();
 
             if (value == NULL) {
                 usage(stderr, args->program_name, "action \"%s\" expects a value.", arg);
@@ -120,9 +133,10 @@ void usage(FILE *stream, const char *program_name, char *error_message, ...) {
     fprintf(stream, "Actions:\n");
     fprintf(stream, "    add             a    [title] [filepath?]   add a new file to the system.\n");
     fprintf(stream, "    remove          r    [filepath]            remove a file from the system.\n");
-    fprintf(stream, "    parse-as-json   p    [filepath]            parse a .wodo as json\n");
-    fprintf(stream, "    help            h                          display this help message\n");
+    fprintf(stream, "    parse-as-json   p    [filepath]            parse a .wodo file as json\n");
     fprintf(stream, "    list            l                          list database files\n");
+    fprintf(stream, "    format          f    [filepath]            format a .wodo file\n");
+    fprintf(stream, "    help            h                          display this help message\n");
     fprintf(stream, "\n");
     fprintf(stream, "Flags:\n");
     fprintf(stream, "    --filter-tag    -ft                        specify a tag to filter. use this arg multiple times if you want to filter for multiple tags.\n");

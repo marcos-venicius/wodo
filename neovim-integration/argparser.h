@@ -8,6 +8,7 @@ typedef enum {
     AK_REMOVE,
     AK_PARSE_AS_JSON,
     AK_LIST,
+    AK_FORMAT,
 } ArgumentKind;
 
 typedef struct {

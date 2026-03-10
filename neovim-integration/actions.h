@@ -9,5 +9,6 @@ int add_action(const char *name);
 int remove_action(const char *filepath);
 int parse_as_json_action(const char *filepath, Flags flags);
 int list_action();
+int format_action(const char *filepath);
 
 #endif // !_WODO_ACTIONS_H_

@@ -10,6 +10,7 @@
 #include "./json.h"
 #include "./io.h"
 #include "./database.h"
+#include "visualizer.h"
 
 int add_path_action(const char *name, const char *filepath) {
     char *abs_path = realpath(filepath, NULL);
@@ -105,7 +106,7 @@ int remove_action(const char *filepath) {
 }
 
 int parse_as_json_action(const char *filepath, Flags flags) {
-    (void)flags;
+    (void)flags; // TODO: be implemented later
 
     char *abs_path = realpath(filepath, NULL);
 
@@ -113,6 +114,13 @@ int parse_as_json_action(const char *filepath, Flags flags) {
         fprintf(stderr, "\033[1;31merror:\033[0m invalid filepath\n");
 
         return 1;
+    }
+
+    database_status_code_t status_code = DATABASE_OK_STATUS_CODE;
+
+    if ((status_code = database_get_file_by_filepath(NULL, abs_path)) != DATABASE_OK_STATUS_CODE) {
+        fprintf(stderr, "error: could not format file because we couldn't get it from database: %s\n", database_status_code_string(status_code));
+        return status_code;
     }
 
     char *content;
@@ -137,3 +145,129 @@ int list_action() {
     return 0;
 }
 
+static void print_trimed_string(wodo_string_t string) {
+    size_t start_cursor = 0;
+    size_t end_cursor = string.length - 1;
+
+    while (start_cursor < string.length && string.value[start_cursor] == ' ') start_cursor++;
+    while (end_cursor > start_cursor && string.value[end_cursor] == ' ') end_cursor--;
+
+    printf("%.*s", (int)(end_cursor - start_cursor + 1), string.value + start_cursor);
+}
+
+static void print_trimed_line_string(wodo_string_t string) {
+    size_t first_line = 0;
+    size_t last_line = string.length - 1;
+    size_t start_cursor = 0;
+    size_t end_cursor = string.length - 1;
+
+    while (true) {
+        while (start_cursor < string.length && string.value[start_cursor] == ' ') start_cursor++;
+
+        // reached the end of the description with all blank lines
+        if (start_cursor >= string.length) {
+            first_line = string.length - 1;
+
+            break;
+        }
+
+        if (string.value[start_cursor] == '\n') {
+            start_cursor++;
+            continue;
+        }
+
+        first_line = start_cursor;
+
+        break;
+    }
+
+    while (true) {
+        while (end_cursor > start_cursor && string.value[end_cursor] == ' ') end_cursor--;
+
+        // reached the beginning of the description with all blank lines
+        if (end_cursor <= start_cursor) {
+            last_line = start_cursor;
+
+            break;
+        }
+
+        if (string.value[end_cursor] == '\n') {
+            end_cursor--;
+            continue;
+        }
+
+        last_line = end_cursor;
+
+        break;
+    }
+
+    printf("%.*s", (int)(last_line - first_line + 1), string.value + first_line);
+}
+
+int format_action(const char *filepath) {
+    char *abs_path = realpath(filepath, NULL);
+
+    if (abs_path == NULL) {
+        fprintf(stderr, "\033[1;31merror:\033[0m invalid filepath\n");
+
+        return 1;
+    }
+
+    database_status_code_t status_code = DATABASE_OK_STATUS_CODE;
+
+    if ((status_code = database_get_file_by_filepath(NULL, abs_path)) != DATABASE_OK_STATUS_CODE) {
+        fprintf(stderr, "error: could not format file because we couldn't get it from database: %s\n", database_status_code_string(status_code));
+        return status_code;
+    }
+
+    char *content;
+
+    size_t length = read_from_file(filepath, &content);
+
+    reset_parser_state();
+
+    wodo_task_t *tasks = parse_tasks(filepath, content, length);
+
+    for (size_t i = 0; i < cl_arr_len(tasks); i++) {
+        if (i > 0) printf("\n");
+
+        wodo_task_t task = tasks[i];
+
+        printf("%% ");
+        print_trimed_string(task.title.as.title);
+        printf("\n");
+        printf("\n");
+        printf(".state ");
+        switch (task.state_property.as.state_property) {
+            case Wodo_Task_State_Todo: printf("todo\n"); break;
+            case Wodo_Task_State_Doing: printf("doing\n"); break;
+            case Wodo_Task_State_Blocked: printf("blocked\n"); break;
+            case Wodo_Task_State_Done: printf("done\n"); break;
+            default: assert(0 && "unhandled state during formatting");
+        }
+        printf(".date  ");
+        print_wodo_datetime(task.date_property.as.date_property, false);
+        printf("\n");
+        printf(".tags");
+
+        if (cl_arr_len(task.tags_property.as.tags_property) > 0) {
+            printf("  ");
+            for (size_t j = 0; j < (cl_arr_len(task.tags_property.as.tags_property)); j++) {
+                if (j > 0) printf(" ");
+
+                wodo_string_t tag = task.tags_property.as.tags_property[j].as.tag;
+
+                printf("%.*s", (int)tag.length, tag.value);
+            }
+        }
+        printf("\n");
+
+        if (task.description.as.description.length > 0) {
+            printf("\n");
+            print_trimed_line_string(task.description.as.description);
+            printf("\n");
+        }
+    }
+
+    return 0;
+}

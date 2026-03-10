@@ -204,7 +204,8 @@ database_status_code_t database_get_file_by_filepath(Database_Db_File **out, con
         if (it->deleted) continue;
 
         if (strncmp(filepath, it->filepath, strlen(filepath)) == 0) {
-            *out = it;
+            if (out != NULL)
+                *out = it;
 
             return DATABASE_OK_STATUS_CODE;
         }

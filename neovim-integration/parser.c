@@ -367,11 +367,7 @@ static wodo_task_t parse_task() {
         parser_error("starting task description before defining required property 'date'");
 
     if (!parsed_state_property) 
-        task.state_property = (wodo_node_t){
-            .location = {0},
-            .kind = wodo_node_kind_state_property,
-            .as.state_property = Wodo_Task_State_Todo,
-        };
+        parser_error("starting task description before defining required property 'state'");
 
     if (!parsed_tags_property)
         task.tags_property = (wodo_node_t){

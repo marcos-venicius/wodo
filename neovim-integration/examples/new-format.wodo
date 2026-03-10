@@ -1,10 +1,32 @@
 % Title
 
-.state doing
-.date  2026-02-28 21:56:11-14:00
-.tags  backend javascript c_sharp
+.state       doing
+.date 2026-02-28 21:56:11-14:00
+.tags  backend       javascript               c_sharp
 
-Description
+Description to test formating.               
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 % Second title "I'm trying quotes"
 
@@ -12,11 +34,37 @@ Description
 .tags
 .date  2026-03-05 21:56:11+03:00
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 % Third title
 
 .state doing
 .tags  ux_ui
 .date  2026-03-05 21:56:11Z
+
+
+
+
+
 
 # This is my description
 
@@ -44,6 +92,13 @@ we have only three properties right now .state, .tags, .date;
 
 After the properties, every line that does not starts with '%' is the description of this task.
 
+
+
+
+
+
+
 % Hello world
 
+.state todo
 .date  2026-03-05 21:56:11-03:00
