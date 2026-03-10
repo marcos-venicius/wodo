@@ -528,6 +528,24 @@ local function delete_current_tasks_file()
   end)
 end
 
+local function format_tasks_file()
+  local filepath = vim.fn.expand("%:p")
+  if filepath == "" then return end
+
+  local cmd = "wodo f " .. vim.fn.shellescape(filepath)
+  local formatted = vim.fn.system(cmd)
+
+  if vim.v.shell_error == 0 then
+    local lines = vim.split(formatted, "\n")
+
+    if lines[#lines] == "" then table.remove(lines) end
+
+    vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
+  else
+    vim.notify("Wodo error: " .. formatted, vim.log.levels.ERROR)
+  end
+end
+
 vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
   group = group,
   pattern = { "*.wodo" },
@@ -548,6 +566,7 @@ vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
     vim.keymap.set("n", "]w", next_task)
     vim.keymap.set("n", "[w", prev_task)
     vim.keymap.set("n", "<leader>wl", task_picker)
+    vim.keymap.set("n", "<leader>wf", format_tasks_file)
   end
 })
 
