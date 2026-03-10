@@ -31,11 +31,11 @@ It's going to be the first thing that is loaded in the main function
 extern Database global_database;
 
 // TODO: maybe in the future, do not load the entire database in memory
-database_status_code_t database_load(Database *out);
-void database_save(Database *database);
-void database_free(Database *database);
-database_status_code_t database_get_file_by_filepath(Database_Db_File **out, const Database *database, const char *filepath);
-database_status_code_t database_add_file(Database *database, Database_Db_File *file);
+database_status_code_t database_load();
+void database_save();
+void database_free();
+database_status_code_t database_get_file_by_filepath(Database_Db_File **out, const char *filepath);
+database_status_code_t database_add_file(Database_Db_File *file);
 void database_delete_file(Database_Db_File *file);
 const char *database_status_code_string(database_status_code_t status_code);
 // this function returns a file path inside the data folder with 

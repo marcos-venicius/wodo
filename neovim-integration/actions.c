@@ -9,8 +9,7 @@
 #include <stdio.h>
 #include "./json.h"
 #include "./io.h"
-
-Database global_database; // forward declared?
+#include "./database.h"
 
 int add_path_action(const char *name, const char *filepath) {
     char *abs_path = realpath(filepath, NULL);
@@ -35,7 +34,7 @@ int add_path_action(const char *name, const char *filepath) {
     file->filepath[abs_path_size] = '\0';
     file->name[name_size] = '\0';
 
-    database_status_code_t status_code = database_add_file(&global_database, file);
+    database_status_code_t status_code = database_add_file(file);
     
     if (status_code != DATABASE_OK_STATUS_CODE) {
         fprintf(stderr, "\033[1;31merror:\033[0m could not add file due to: %s\n", database_status_code_string(status_code));
@@ -54,7 +53,7 @@ int add_path_action(const char *name, const char *filepath) {
     free(content);
     cl_arr_free(tasks);
 
-    database_save(&global_database);
+    database_save();
 
     return 0;
 }
@@ -86,7 +85,7 @@ int remove_action(const char *filepath) {
 
     Database_Db_File *file = NULL;
 
-    status_code = database_get_file_by_filepath(&file, &global_database, filepath);
+    status_code = database_get_file_by_filepath(&file, filepath);
 
     if (status_code == DATABASE_NOT_FOUND_STATUS_CODE) {
         return 0;
@@ -100,7 +99,7 @@ int remove_action(const char *filepath) {
 
     database_delete_file(file);
 
-    database_save(&global_database);
+    database_save();
 
     return 0;
 }

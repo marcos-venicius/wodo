@@ -6,10 +6,12 @@
 
 #define defer(code) do { return_code = code; goto end; } while (0)
 
+Database global_database = {0};
+
 int main(int argc, char **argv) {
     int return_code = 0;
 
-    database_status_code_t status_code = database_load(&global_database);
+    database_status_code_t status_code = database_load();
 
     if (status_code != DATABASE_OK_STATUS_CODE) {
         fprintf(stderr, "error: could not open database due to: %s\n", database_status_code_string(status_code));
@@ -37,7 +39,7 @@ int main(int argc, char **argv) {
 end:
     if (args != NULL) free(args);
 
-    database_free(&global_database);
+    database_free();
 
     return return_code;
 }
