@@ -1,3 +1,7 @@
+local function set_winbar_title(title)
+  vim.api.nvim_set_option_value("winbar", "  %= " .. title .. " %=", { scope = "local" })
+end
+
 local function create_task_boilerplate()
   local date = os.date("%Y-%m-%d %H:%M:%S%z")
 
@@ -344,7 +348,7 @@ local function task_picker()
 end
 
 local function create_tasks_file()
-  vim.ui.input({ prompt = "Tasks file name: " }, function(input)
+  vim.ui.input({ prompt = "Tasks title: " }, function(input)
     if not input or input == "" then
       return
     end
@@ -365,6 +369,32 @@ local function create_tasks_file()
 
         -- run your boilerplate function
         create_task_boilerplate()
+      end)
+    end)
+  end)
+end
+
+local function rename_tasks_file()
+  local path = vim.api.nvim_buf_get_name(0)
+
+  if path == "" then return end
+
+  vim.ui.input({ prompt = "New tasks title: " }, function(input)
+    if not input or input == "" then
+      return
+    end
+
+    vim.system({ "wodo", "n", path, input }, { text = true }, function(result)
+      if result.code ~= 0 then
+        vim.schedule(function()
+          vim.notify("Failed to rename tasks file", vim.log.levels.ERROR)
+        end)
+        return
+      end
+
+      vim.schedule(function()
+        set_winbar_title(input)
+        vim.notify("File renamed successfully", vim.log.levels.INFO)
       end)
     end)
   end)
@@ -462,7 +492,7 @@ local function telescope_list_tasks()
 
             local path = entry.value.path
             vim.cmd({ cmd = "edit", args = { path } })
-            vim.api.nvim_set_option_value("winbar", "  %= " .. entry.value.name .. " %=", { scope = "local" })
+            set_winbar_title(entry.value.name)
           end)
 
           return true
@@ -549,24 +579,27 @@ end
 vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
   group = group,
   pattern = { "*.wodo" },
-  callback = function()
+  callback = function(ev)
     vim.opt_local.filetype = 'wodo'
     vim.opt_local.conceallevel = 2
     vim.opt_local.concealcursor = 'nc'
 
-    vim.keymap.set("n", "<leader>wn", create_task_boilerplate)
-    vim.keymap.set("n", "<leader>wt", function() set_task_state("todo") end)
-    vim.keymap.set("n", "<leader>wi", function() set_task_state("doing") end)
-    vim.keymap.set("n", "<leader>wb", function() set_task_state("blocked") end)
-    vim.keymap.set("n", "<leader>wd", function() set_task_state("done") end)
-    vim.keymap.set("n", "<leader>wx", delete_current_tasks_file)
-    vim.keymap.set("n", "gt", goto_title)
-    vim.keymap.set("n", "gd", goto_description)
-    vim.keymap.set("n", "gT", goto_tags)
-    vim.keymap.set("n", "]w", next_task)
-    vim.keymap.set("n", "[w", prev_task)
-    vim.keymap.set("n", "<leader>wl", task_picker)
-    vim.keymap.set("n", "<leader>wf", format_tasks_file)
+    local opts = { buffer = ev.buf, remap = false }
+
+    vim.keymap.set("n", "<leader>wn", create_task_boilerplate, opts)
+    vim.keymap.set("n", "<leader>wt", function() set_task_state("todo") end, opts)
+    vim.keymap.set("n", "<leader>wi", function() set_task_state("doing") end, opts)
+    vim.keymap.set("n", "<leader>wb", function() set_task_state("blocked") end, opts)
+    vim.keymap.set("n", "<leader>wd", function() set_task_state("done") end, opts)
+    vim.keymap.set("n", "<leader>wx", delete_current_tasks_file, opts)
+    vim.keymap.set("n", "gt", goto_title, opts)
+    vim.keymap.set("n", "gd", goto_description, opts)
+    vim.keymap.set("n", "gT", goto_tags, opts)
+    vim.keymap.set("n", "]w", next_task, opts)
+    vim.keymap.set("n", "[w", prev_task, opts)
+    vim.keymap.set("n", "<leader>wl", task_picker, opts)
+    vim.keymap.set("n", "<leader>wf", format_tasks_file, opts)
+    vim.keymap.set("n", "<leader>wr", rename_tasks_file, opts)
   end
 })
 
