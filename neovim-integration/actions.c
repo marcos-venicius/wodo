@@ -106,8 +106,6 @@ int remove_action(const char *filepath) {
 }
 
 int parse_as_json_action(const char *filepath, Flags flags) {
-    (void)flags; // TODO: be implemented later
-
     char *abs_path = realpath(filepath, NULL);
 
     if (abs_path == NULL) {

@@ -245,7 +245,7 @@ local function prev_task()
   end
 end
 
-local function task_picker()
+local function task_picker(flags)
   local pickers = require("telescope.pickers")
   local finders = require("telescope.finders")
   local conf = require("telescope.config").values
@@ -256,7 +256,15 @@ local function task_picker()
 
   local path = vim.api.nvim_buf_get_name(0)
 
-  vim.system({ "wodo", "p", path }, { text = true }, function(result)
+  local cmd = { "wodo", "p", path }
+
+  if flags and #flags > 0 then
+    for _, v in ipairs(flags) do
+      table.insert(cmd, v)
+    end
+  end
+
+  vim.system(cmd, { text = true }, function(result)
     local ok, data = pcall(vim.json.decode, result.stdout)
     if not ok then return end
 
@@ -400,7 +408,7 @@ local function rename_tasks_file()
   end)
 end
 
-local function telescope_list_tasks()
+local function telescope_list_tasks(flags)
   local pickers = require("telescope.pickers")
   local finders = require("telescope.finders")
   local conf = require("telescope.config").values
@@ -408,7 +416,15 @@ local function telescope_list_tasks()
   local action_state = require("telescope.actions.state")
   local previewers = require("telescope.previewers")
 
-  vim.system({ "wodo", "l" }, { text = true }, function(result)
+  local cmd = { "wodo", "l" }
+
+  if flags and #flags > 0 then
+    for _, v in ipairs(flags) do
+      table.insert(cmd, v)
+    end
+  end
+
+  vim.system(cmd, { text = true }, function(result)
     if result.code ~= 0 then
       vim.schedule(function()
         vim.notify("Failed to list task files", vim.log.levels.ERROR)
@@ -576,6 +592,54 @@ local function format_tasks_file()
   end
 end
 
+local function search_tasks()
+  vim.ui.input({ prompt = "Filters: state:<state>, tag:<tag>" }, function(input)
+    if not input or input == "" then
+      return
+    end
+
+    local flags = {}
+
+    for state in input:gmatch("state:(%S+)") do
+      table.insert(flags, "-fs")
+      table.insert(flags, state)
+    end
+
+    for tag in input:gmatch("tag:(%S+)") do
+      table.insert(flags, "-ft")
+      table.insert(flags, tag)
+    end
+
+    if #flags > 0 then
+      task_picker(flags)
+    end
+  end)
+end
+
+local function search_file_tasks()
+  vim.ui.input({ prompt = "Filters: state:<state>, tag:<tag>" }, function(input)
+    if not input or input == "" then
+      return
+    end
+
+    local flags = {}
+
+    for state in input:gmatch("state:(%S+)") do
+      table.insert(flags, "-fs")
+      table.insert(flags, state)
+    end
+
+    for tag in input:gmatch("tag:(%S+)") do
+      table.insert(flags, "-ft")
+      table.insert(flags, tag)
+    end
+
+    if #flags > 0 then
+      telescope_list_tasks(flags)
+    end
+  end)
+end
+
 vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
   group = group,
   pattern = { "*.wodo" },
@@ -597,9 +661,10 @@ vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
     vim.keymap.set("n", "gT", goto_tags, opts)
     vim.keymap.set("n", "]w", next_task, opts)
     vim.keymap.set("n", "[w", prev_task, opts)
-    vim.keymap.set("n", "<leader>wl", task_picker, opts)
+    vim.keymap.set("n", "<leader>wl", function() task_picker(nil) end, opts)
     vim.keymap.set("n", "<leader>wf", format_tasks_file, opts)
     vim.keymap.set("n", "<leader>wr", rename_tasks_file, opts)
+    vim.keymap.set("n", "<leader>ws", search_tasks, opts)
   end
 })
 
@@ -608,7 +673,8 @@ vim.api.nvim_create_autocmd("BufEnter", {
   pattern = "*",
   callback = function()
     vim.keymap.set("n", "<leader>wa", create_tasks_file)
-    vim.keymap.set("n", "<leader>wL", telescope_list_tasks)
+    vim.keymap.set("n", "<leader>wL", function() telescope_list_tasks(nil) end)
+    vim.keymap.set("n", "<leader>wS", search_file_tasks)
   end
 })
 

@@ -11,6 +11,7 @@
 
 static bool task_match_flags(wodo_task_t task, Flags flags) {
     bool matched_any_states = cl_arr_len(flags.state_filter) == 0;
+    bool matched_any_tags = cl_arr_len(flags.tag_filter) == 0;
 
     wodo_task_state_t task_state = task.state_property.as.state_property;
 
@@ -44,7 +45,25 @@ static bool task_match_flags(wodo_task_t task, Flags flags) {
         break;
     }
 
-    return matched_any_states;
+    wodo_node_t *tags = task.tags_property.as.tags_property;
+
+    for (size_t i = 0; i < cl_arr_len(flags.tag_filter); i++) {
+        const char *tag_filter = flags.tag_filter[i];
+
+        for (size_t j = 0; j < cl_arr_len(tags); j++) {
+            wodo_string_t task_tag = tags[j].as.tag;
+
+            if (strncmp(tag_filter, task_tag.value, task_tag.length) == 0) {
+                matched_any_tags = true;
+
+                break;
+            }
+        }
+
+        if (matched_any_tags) break;
+    }
+
+    return matched_any_states && matched_any_tags;
 }
 
 void print_tasks_to_stdout_as_json(wodo_task_t *tasks, Flags flags) {
