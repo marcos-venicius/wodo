@@ -15,6 +15,10 @@ if you want to use it inside your neovim, there is a second version inside [./ne
 
 There is a brand new syntax and way to use.
 
+## Formatting files with <leader>wf
+
+https://github.com/user-attachments/assets/fb920f90-5fe5-4c13-aebd-a85c8be5d13d
+
 ## Using as a CLI
 
 <img width="1313" height="555" alt="image" src="https://github.com/user-attachments/assets/7269252a-069f-49f5-a64c-6bc2d90a0206" />
