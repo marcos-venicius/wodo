@@ -9,7 +9,7 @@
 #include "./io.h"
 #include "./parser.h"
 
-void print_tasks_to_stdout_as_json(wodo_task_t *tasks, bool breakLine) {
+void print_tasks_to_stdout_as_json(wodo_task_t *tasks) {
     printf("[");
     for (size_t i = 0; i < cl_arr_len(tasks); i++) {
         // separate objects
@@ -146,10 +146,9 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks, bool breakLine) {
         printf("}");
     }
     printf("]");
-    if (breakLine) printf("\n");
 }
 
-void print_database_files_to_stdout_as_json(Database *database) {
+void print_database_files_to_stdout_as_json() {
     int total_count = 0;
     int todo_count = 0;
     int doing_count = 0;
@@ -157,10 +156,10 @@ void print_database_files_to_stdout_as_json(Database *database) {
     int done_count = 0;
 
     printf("[");
-    for (size_t i = 0; i < cl_arr_len(database->files); i++) {
+    for (size_t i = 0; i < cl_arr_len(global_database.files); i++) {
         if (i > 0) printf(",");
 
-        Database_Db_File *it = database->files[i];
+        Database_Db_File *it = global_database.files[i];
 
         char *content;
 
@@ -212,7 +211,7 @@ void print_database_files_to_stdout_as_json(Database *database) {
         printf(",");
         {
             printf("\"tasks\":");
-            print_tasks_to_stdout_as_json(tasks, false);
+            print_tasks_to_stdout_as_json(tasks);
         }
         printf("}");
 

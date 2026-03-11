@@ -131,7 +131,9 @@ int parse_as_json_action(const char *filepath, Flags flags) {
 
     wodo_task_t *tasks = parse_tasks(filepath, content, length);
 
-    print_tasks_to_stdout_as_json(tasks, true);
+    print_tasks_to_stdout_as_json(tasks);
+
+    printf("\n");
 
     free(content);
     cl_arr_free(tasks);
@@ -140,7 +142,7 @@ int parse_as_json_action(const char *filepath, Flags flags) {
 }
 
 int list_action() {
-    print_database_files_to_stdout_as_json(&global_database);
+    print_database_files_to_stdout_as_json();
 
     return 0;
 }
