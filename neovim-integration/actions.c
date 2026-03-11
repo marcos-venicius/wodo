@@ -273,3 +273,27 @@ int format_action(const char *filepath) {
 
     return 0;
 }
+
+int rename_action(const char *filepath, char *title) {
+    char *abs_path = realpath(filepath, NULL);
+
+    if (abs_path == NULL) {
+        fprintf(stderr, "\033[1;31merror:\033[0m invalid filepath\n");
+
+        return 1;
+    }
+
+    for (size_t i = 0; i < cl_arr_len(global_database.files); i++) {
+        Database_Db_File *file = global_database.files[i];
+
+        if (strncmp(file->filepath, filepath, strlen(file->filepath)) == 0) {
+            database_rename_file(file, title);
+
+            database_save();
+
+            return 0;
+        }
+    }
+
+    return DATABASE_NOT_FOUND_STATUS_CODE;
+}

@@ -37,6 +37,7 @@ void database_free();
 database_status_code_t database_get_file_by_filepath(Database_Db_File **out, const char *filepath);
 database_status_code_t database_add_file(Database_Db_File *file);
 void database_delete_file(Database_Db_File *file);
+void database_rename_file(Database_Db_File *file, char *name);
 const char *database_status_code_string(database_status_code_t status_code);
 // this function returns a file path inside the data folder with 
 // a hash of the name suffixed with the current unix UTC timestamp

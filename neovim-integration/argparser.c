@@ -50,14 +50,34 @@ Arguments *parse_arguments(int argc, char **argv) {
             char *value = getarg();
 
             if (value == NULL) {
-                usage(stderr, args->program_name, "action \"%s\" expects an id. you don't have any selected files", arg);
+                usage(stderr, args->program_name, "action \"%s\" expects a path.", arg);
 
                 goto error;
             }
 
             args->kind = AK_REMOVE;
             args->arg1 = value;
-        } else if (arg_cmp(arg, "parse-as-json", "p")) {
+        } else if (arg_cmp(arg, "rename", "n")) {
+            char *path = getarg();
+
+            if (path == NULL) {
+                usage(stderr, args->program_name, "action \"%s\" expects a path.", arg);
+
+                goto error;
+            }
+
+            char *title = getarg();
+
+            if (title == NULL) {
+                usage(stderr, args->program_name, "action \"%s\" expects a title.", arg);
+
+                goto error;
+            }
+
+            args->kind = AK_RENAME;
+            args->arg1 = path;
+            args->arg2 = title;
+        } else if (arg_cmp(arg, "parse", "p")) {
             args->kind = AK_PARSE_AS_JSON;
 
             char *value = getarg();
@@ -104,9 +124,9 @@ Arguments *parse_arguments(int argc, char **argv) {
             cl_arr_push(args->flags.state_filter, value);
         } else {
             if (*arg == '-') {
-                usage(stderr, args->program_name, "flag %s does not exists", arg);
+                usage(stderr, args->program_name, "flag %s does not exists.", arg);
             } else {
-                usage(stderr, args->program_name, "action \"%s\" does not exists", arg);
+                usage(stderr, args->program_name, "action \"%s\" does not exists.", arg);
             }
 
             goto error;
@@ -128,24 +148,31 @@ void usage(FILE *stream, const char *program_name, char *error_message, ...) {
     printf("DEVMODE\n");
 #endif
 
-    fprintf(stream, "%s [action] [arguments?] [flags?]\n", program_name);
-    fprintf(stream, "\n");
-    fprintf(stream, "Actions:\n");
-    fprintf(stream, "    add             a    [title] [filepath?]   add a new file to the system.\n");
-    fprintf(stream, "    remove          r    [filepath]            remove a file from the system.\n");
-    fprintf(stream, "    parse-as-json   p    [filepath]            parse a .wodo file as json\n");
-    fprintf(stream, "    list            l                          list database files\n");
-    fprintf(stream, "    format          f    [filepath]            format a .wodo file\n");
-    fprintf(stream, "    help            h                          display this help message\n");
-    fprintf(stream, "\n");
-    fprintf(stream, "Flags:\n");
-    fprintf(stream, "    --filter-tag    -ft                        specify a tag to filter. use this arg multiple times if you want to filter for multiple tags.\n");
-    fprintf(stream, "    --filter-state  -fs                        specify a state to filter. use this arg multiple times if you want to filter for multiple states.\n");
-    fprintf(stream, "\n");
-    fprintf(stream, "States: todo, doing, blocked, done\n");
-    fprintf(stream, "\n");
-    fprintf(stream, "When you run `add` without a filepath the system will create a new file\n");
-    fprintf(stream, "inside the root folder of the application.\n");
+    fprintf(stream, "Usage: %s [action] [arguments] [flags]\n\n", program_name);
+
+    // --- FILE MANAGEMENT GROUP ---
+    fprintf(stream, "File Management:\n");
+    fprintf(stream, "  add, a     <title> [path]     Add a new file (defaults to root if path is omitted)\n");
+    fprintf(stream, "  remove, r  <path>             Remove a file from the system\n");
+    fprintf(stream, "  rename, n  <path> <title>     Rename an existing .wodo file\n");
+    fprintf(stream, "  format, f  <path>             Format and clean a .wodo file\n\n");
+
+    // --- DATA & INSPECTION GROUP ---
+    fprintf(stream, "Data & Inspection:\n");
+    fprintf(stream, "  list, l    [flags]            List all database files\n");
+    fprintf(stream, "  parse, p   <path> [flags]     Parse a .wodo file as JSON\n\n");
+
+    // --- FILTER FLAGS GROUP ---
+    fprintf(stream, "Global Filter Flags (use with list/parse):\n");
+    fprintf(stream, "  -ft, --filter-tag   <tag>     Filter by tag (can be used multiple times)\n");
+    fprintf(stream, "  -fs, --filter-state <state>   Filter by state (can be used multiple times)\n\n");
+
+    // --- REFERENCE DATA ---
+    fprintf(stream, "Available States:\n");
+    fprintf(stream, "  todo, doing, blocked, done\n\n");
+
+    fprintf(stream, "General:\n");
+    fprintf(stream, "  help, h                       Display this help message\n");
 
     if (error_message != NULL) {
         va_start(args, error_message);

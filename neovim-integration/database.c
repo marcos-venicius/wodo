@@ -246,3 +246,12 @@ void database_delete_file(Database_Db_File *file)
 {
     file->deleted = true;
 }
+
+void database_rename_file(Database_Db_File *file, char *name)
+{
+    size_t name_size = strlen(name);
+
+    memcpy(file->name, name, name_size);
+
+    file->name[name_size] = '\0';
+}
