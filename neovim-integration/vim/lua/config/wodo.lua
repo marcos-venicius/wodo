@@ -682,3 +682,42 @@ vim.api.nvim_set_hl(0, "wodoStateTodo", { fg = "#ffb86c" })
 vim.api.nvim_set_hl(0, "wodoStateDoing", { fg = "#8be9fd" })
 vim.api.nvim_set_hl(0, "wodoStateDone", { fg = "#50fa7b" })
 vim.api.nvim_set_hl(0, "wodoStateBlocked", { fg = "#ff5555" })
+
+vim.api.nvim_create_autocmd("VimEnter", {
+  group = vim.api.nvim_create_augroup("WodoReminders", { clear = true }),
+  callback = function()
+    vim.fn.jobstart({ "wodo", "reminders" }, {
+      stdout_buffered = true,
+      on_stdout = function(_, data)
+        if not data or #data == 0 or (#data == 1 and data[1] == "") then return end
+
+        local json_output = table.concat(data, "\n")
+        local ok, parsed_data = pcall(vim.json.decode, json_output)
+        
+        if not ok or type(parsed_data) ~= "table" then return end
+
+        for _, file_data in ipairs(parsed_data) do
+          local project_name = file_data.name or "Unknown Project"
+
+          if file_data.tasks then
+            for _, task in ipairs(file_data.tasks) do
+              if task.remind and task.remind.content == true then
+                local title = task.title and task.title.content or "No Title"
+                local state = "[" .. task.state.content .. "]"
+
+                vim.schedule(function()
+                  Snacks.notifier.notify(task.description.content, vim.log.levels.INFO, {
+                    title = state .. " (" .. project_name .. ") " .. title,
+                    ft = "wodo",
+                    style = "fancy",
+                    timeout = 5000
+                  })
+                end)
+              end
+            end
+          end
+        end
+      end
+    })
+  end,
+})

@@ -2,7 +2,6 @@
 
 .state       doing
 .date 2026-02-28 21:56:11-14:00
-.remind
 .tags  backend       javascript               c_sharp
 
 Description to test formating.               
@@ -61,6 +60,7 @@ Description to test formating.
 .state doing
 .tags  ux_ui
 .date  2026-03-05 21:56:11Z
+.remind
 
 
 
@@ -102,5 +102,4 @@ After the properties, every line that does not starts with '%' is the descriptio
 % Hello world
 
 .state todo
-.remind
 .date  2026-03-05 21:56:11-03:00
