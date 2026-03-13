@@ -263,6 +263,10 @@ int format_action(const char *filepath) {
         }
         printf("\n");
 
+        if (task.remind_property.boolean) {
+            printf(".remind\n");
+        }
+
         if (task.description.string.length > 0) {
             printf("\n");
             print_trimed_line_string(task.description.string);
