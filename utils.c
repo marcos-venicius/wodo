@@ -1,4 +1,5 @@
-#include "./utils.h"
+#define CL_ARRAY_IMPLEMENTATION
+
 #include <pwd.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -9,6 +10,11 @@
 #include <wchar.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include "./utils.h"
+#include "./clibs/arr.h"
+#include <stdbool.h>
+#include "./systemtypes.h"
+#include "./argparser.h"
 
 const char *get_user_home_folder(void) {
     const char *home = getenv("HOME");
@@ -110,4 +116,155 @@ char *join_paths(const char *text, ...) {
 
 unsigned long get_current_timestamp(void) {
     return (unsigned long)time(NULL);
+}
+
+SysDateTime get_today_date(void) {
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+
+    // Extract day, month, and year
+    int day = tm.tm_mday;    // Day of the month (1-31)
+    int month = tm.tm_mon + 1; // Month (0-11), so add 1
+    int year = tm.tm_year + 1900; // Year since 1900, so add 1900
+    int hour = tm.tm_hour;
+    int minute = tm.tm_min;
+
+    return (SysDateTime){.day = day, .month = month, .year = year, .hour = hour, .minute = minute };
+}
+
+time_t get_timestamp(SysDateTime sys_date_time) {
+    struct tm t = {0};
+
+    t.tm_year = sys_date_time.year - 1900;
+    t.tm_mon = sys_date_time.month - 1;
+    t.tm_mday = sys_date_time.day;
+    t.tm_hour = sys_date_time.hour;
+    t.tm_min = sys_date_time.minute;
+    t.tm_sec = 0;
+
+    time_t timestamp = mktime(&t);
+
+    if (timestamp == -1) {
+        fprintf(stderr, "could not convert to timestamp\n");
+        exit(1);
+    }
+
+    return timestamp;
+}
+
+bool cmp_sized_strings(const char *a, const char *b, size_t len_a, size_t len_b) {
+    if (len_a != len_b) return false;
+
+    for (size_t i = 0; i < len_a; ++i)
+        if (a[i] != b[i]) return false;
+
+    return true;
+}
+
+bool arg_cmp(const char *actual, const char *expected, const char *alternative) {
+    size_t actual_length = strlen(actual);
+    size_t expected_length = strlen(expected);
+    size_t alternative_length = strlen(alternative);
+
+    bool expected_result = cmp_sized_strings(actual, expected, actual_length, expected_length);
+    bool alternative_result = cmp_sized_strings(actual, alternative, actual_length, alternative_length);
+
+    return  expected_result || alternative_result;
+}
+
+bool arg_cmp_single(const char *actual, const char *expected) {
+    size_t actual_length = strlen(actual);
+    size_t expected_length = strlen(expected);
+
+    bool expected_result = cmp_sized_strings(actual, expected, actual_length, expected_length);
+
+    return  expected_result;
+}
+
+void print_scaped_string_to_fd(wodo_string_t string, FILE *file) {
+    fprintf(file, "\"");
+    size_t last_index = 0;
+
+    for (size_t i = 0; i < string.length; i++) {
+        switch (string.value[i]) {
+            case '"': {
+                fprintf(file, "%.*s", (int)(i - last_index), string.value + last_index);
+                fprintf(file, "\\\"");
+
+                // skip double quotes
+                last_index = i + 1;
+            } break;
+            case '\n': {
+                fprintf(file, "%.*s", (int)(i - last_index), string.value + last_index);
+                fprintf(file, "\\n");
+
+                // skip double quotes
+                last_index = i + 1;
+            } break;
+        }
+    }
+
+    if (last_index < string.length)
+        fprintf(file, "%.*s", (int)(string.length - last_index), string.value + last_index);
+
+    fprintf(file, "\"");
+}
+
+bool default_task_predicate(wodo_task_t task, Flags *flags) {
+    if (flags == NULL) return true;
+
+    bool matched_any_states = cl_arr_len(flags->state_filter) == 0;
+    bool matched_any_tags = cl_arr_len(flags->tag_filter) == 0;
+
+    wodo_task_state_t task_state = task.state_property.state;
+
+    for (size_t i = 0; i < cl_arr_len(flags->state_filter); i++) {
+        const char *state = flags->state_filter[i];
+
+        size_t state_size = strlen(state);
+
+        if (strncmp(state, "todo", state_size) == 0) {
+            if (task_state == Wodo_Task_State_Todo) {
+                matched_any_states = true;
+                break;
+            }
+        } else if (strncmp(state, "doing", state_size) == 0) {
+            if (task_state == Wodo_Task_State_Doing) {
+                matched_any_states = true;
+                break;
+            }
+        } else if (strncmp(state, "blocked", state_size) == 0) {
+            if (task_state == Wodo_Task_State_Blocked) {
+                matched_any_states = true;
+                break;
+            }
+        } else if (strncmp(state, "done", state_size) == 0) {
+            if (task_state == Wodo_Task_State_Done) {
+                matched_any_states = true;
+                break;
+            }
+        }
+
+        break;
+    }
+
+    wodo_node_t *tags = task.tags_property.node_array;
+
+    for (size_t i = 0; i < cl_arr_len(flags->tag_filter); i++) {
+        const char *tag_filter = flags->tag_filter[i];
+
+        for (size_t j = 0; j < cl_arr_len(tags); j++) {
+            wodo_string_t task_tag = tags[j].string;
+
+            if (strncmp(tag_filter, task_tag.value, task_tag.length) == 0) {
+                matched_any_tags = true;
+
+                break;
+            }
+        }
+
+        if (matched_any_tags) break;
+    }
+
+    return matched_any_states && matched_any_tags;
 }
