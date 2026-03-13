@@ -51,14 +51,9 @@ ln -sf $(PWD)/nvim/syntax/wodo.vim $(USER_HOME)/.config/nvim/syntax/wodo.vim
 ln -sf $(PWD)/nvim/lua/config/wodo.lua $(USER_HOME)/.config/nvim/lua/config/wodo.lua
 ```
 
-> [!INFO]
+> [!NOTE]
 > I'm using Snacks plugin default notifier for notifications and telescope for pickers
 
 ## Formatting files with `<leader>wf`
 
 https://github.com/user-attachments/assets/fb920f90-5fe5-4c13-aebd-a85c8be5d13d
-
-### ✨ It's comming a brand new wodo file format ✨
-
-<img width="1203" height="668" alt="image" src="https://github.com/user-attachments/assets/2c86aa76-865e-4b1c-9b87-30e7bb57eff7" />
-
