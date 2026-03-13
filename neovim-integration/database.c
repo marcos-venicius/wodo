@@ -170,14 +170,12 @@ database_status_code_t database_load() {
 
     char magic_bytes[6] = {0}; // .WODO\0
 
-    if (fread(&magic_bytes, sizeof(char), 5, file) != 5) {
+    if (fread(&magic_bytes, sizeof(char), 6, file) != 6) {
         return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
     }
 
     // load new database format
     if (strncmp(magic_bytes, db_file_magic_bytes, 5) == 0) {
-        fclose(file);
-
         return read_database(file);
     }
 
@@ -260,15 +258,13 @@ database_status_code_t database_load() {
     return DATABASE_OK_STATUS_CODE;
 }
 
-void database_save() {
-    const char *database_filepath = get_database_filepath();
+static void save_database_v1(FILE *file) {
+    short version = DBV_1;
 
-    FILE *file = fopen(database_filepath, "wb");
-
-    if (file == NULL) {
-        fprintf(stderr, "could not open database file: %s\n", strerror(errno));
-        exit(1);
-    }
+    // magic bytes + \0
+    fwrite(db_file_magic_bytes, sizeof(char), strlen(db_file_magic_bytes) + 1, file);
+    // database version
+    fwrite(&version, sizeof(short), 1, file);
 
     size_t length = 0;
 
@@ -288,11 +284,29 @@ void database_save() {
         if (it->deleted) continue;
         uint64_t name_size = strlen(it->name) + 1; // needs to save the null terminator
         uint64_t path_size = strlen(it->filepath) + 1; // needs to save the null terminator
+        uint8_t remind = it->remind ? 1 : 0;
 
         fwrite(&name_size, sizeof(uint64_t), 1, file);
         fwrite(it->name, sizeof(char), name_size, file);
         fwrite(&path_size, sizeof(uint64_t), 1, file);
         fwrite(it->filepath, sizeof(char), path_size, file);
+        fwrite(&remind, sizeof(uint8_t), 1, file);
+    }
+}
+
+void database_save() {
+    const char *database_filepath = get_database_filepath();
+
+    FILE *file = fopen(database_filepath, "wb");
+
+    if (file == NULL) {
+        fprintf(stderr, "could not open database file: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    switch (global_database.version) {
+        case DBV_0: save_database_v1(file); break; // I can upgrade to v1 without problems (secure update)
+        case DBV_1: save_database_v1(file); break;
     }
 
     fclose(file);
