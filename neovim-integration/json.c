@@ -185,6 +185,24 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks, Flags flags) {
 
         printf(",");
 
+        // remind
+        {
+            printf("\"remind\":{");
+            printf("\"content\":%s,", task.remind_property.as.remind_property ? "true" : "false");
+
+            // location
+            {
+                printf("\"location\":{");
+                printf("\"line\":%d,", task.date_property.location.line);
+                printf("\"col\":%d", task.date_property.location.col);
+                printf("}");
+            }
+
+            printf("}");
+        }
+
+        printf(",");
+
         // description
         {
             printf("\"description\":{");

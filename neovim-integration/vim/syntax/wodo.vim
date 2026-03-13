@@ -22,6 +22,8 @@ syntax region wodoBold matchgroup=wodoBoldMarker start=/\*\*/ end=/\*\*/ conceal
 syntax region wodoLink matchgroup=wodoLinkMarker start=/\[/ end=/\]/ concealends nextgroup=wodoLinkURL
 syntax region wodoLinkURL start=/(/ end=/)/ conceal contained
 
+syntax match wodoProperty /^\.\<[a-z_]\+\>\ze\(\s\|$\)/
+
 " ----- State -----
 syntax match wodoStateKey /^\.state\ze\(\s\|$\)/ nextgroup=wodoStateTodo,wodoStateDoing,wodoStateDone,wodoStateBlocked skipwhite
 syntax keyword wodoStateTodo todo contained
@@ -52,6 +54,7 @@ highlight wodoBold gui=bold cterm=bold
 highlight wodoLink gui=underline cterm=underline guifg=#8be9fd
 
 " State Colors
+highlight wodoProperty guifg=#f1fa8c
 highlight wodoStateKey guifg=#f1fa8c
 highlight wodoTagsKey guifg=#f1fa8c
 highlight wodoDateKey guifg=#f1fa8c
