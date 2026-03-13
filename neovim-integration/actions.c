@@ -1,16 +1,17 @@
 #define CL_ARRAY_IMPLEMENTATION
 
-#include "./actions.h"
 #include <string.h>
 #include <errno.h>
 #include "./io.h"
-#include "./parser.h"
-#include "./clibs/arr.h"
 #include <stdio.h>
 #include "./json.h"
 #include "./io.h"
 #include "./database.h"
 #include "visualizer.h"
+#include "./parser.h"
+#include "./actions.h"
+#include "utils.h"
+#include "./clibs/arr.h"
 
 int add_path_action(const char *name, const char *filepath) {
     char *abs_path = realpath(filepath, NULL);
@@ -129,7 +130,7 @@ int parse_as_json_action(const char *filepath, Flags flags) {
 
     wodo_task_t *tasks = parse_tasks(filepath, content, length);
 
-    print_tasks_to_stdout_as_json(tasks, flags);
+    print_tasks_to_stdout_as_json(tasks, default_task_predicate, &flags);
 
     printf("\n");
 
@@ -140,7 +141,7 @@ int parse_as_json_action(const char *filepath, Flags flags) {
 }
 
 int list_action(Flags flags) {
-    print_database_files_to_stdout_as_json(flags);
+    print_database_files_to_stdout_as_json(default_task_predicate, &flags);
 
     return 0;
 }
@@ -294,4 +295,16 @@ int rename_action(const char *filepath, char *title) {
     }
 
     return DATABASE_NOT_FOUND_STATUS_CODE;
+}
+
+static bool get_reminders_action_task_predicate(wodo_task_t task, Flags *flags) {
+    (void)flags;
+
+    return task.state_property.state != Wodo_Task_State_Done && task.remind_property.boolean;
+}
+
+int get_reminders_action() {
+    print_database_files_to_stdout_as_json(get_reminders_action_task_predicate, NULL);
+
+    return 0;
 }

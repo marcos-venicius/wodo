@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <time.h>
+#include "./argparser.h"
 #include "./systemtypes.h"
 
 const char *get_user_home_folder(void);
@@ -16,7 +17,9 @@ unsigned long get_current_timestamp(void);
 SysDateTime get_today_date(void);
 time_t get_timestamp(SysDateTime sys_date_time);
 bool arg_cmp(const char *actual, const char *expected, const char *alternative);
+bool arg_cmp_single(const char *actual, const char *expected);
 bool cmp_sized_strings(const char *a, const char *b, size_t len_a, size_t len_b);
 void print_scaped_string_to_fd(wodo_string_t string, FILE *file);
+bool default_task_predicate(wodo_task_t task, Flags *flags);
 
 #endif // _WODO_UTILS_H_

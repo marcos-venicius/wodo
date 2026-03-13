@@ -102,6 +102,8 @@ Arguments *parse_arguments(int argc, char **argv) {
 
             args->kind = AK_FORMAT;
             args->arg1 = value;
+        } else if (arg_cmp_single(arg, "reminders")) {
+            args->kind = AK_GET_REMINDERS;
         } else if (arg_cmp(arg, "--filter-tag", "-ft")) {
             char *value = getarg();
 
@@ -159,6 +161,7 @@ void usage(FILE *stream, const char *program_name, char *error_message, ...) {
 
     // --- DATA & INSPECTION GROUP ---
     fprintf(stream, "Data & Inspection:\n");
+    fprintf(stream, "  reminders                     List all (not done) tasks marked with 'remind' property\n");
     fprintf(stream, "  list, l    [flags]            List all database files\n");
     fprintf(stream, "  parse, p   <path> [flags]     Parse a .wodo file as JSON\n\n");
 

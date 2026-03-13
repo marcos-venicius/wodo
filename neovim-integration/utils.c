@@ -1,4 +1,5 @@
-#include "./utils.h"
+#define CL_ARRAY_IMPLEMENTATION
+
 #include <pwd.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -9,6 +10,11 @@
 #include <wchar.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include "./utils.h"
+#include "./clibs/arr.h"
+#include <stdbool.h>
+#include "./systemtypes.h"
+#include "./argparser.h"
 
 const char *get_user_home_folder(void) {
     const char *home = getenv("HOME");
@@ -166,6 +172,15 @@ bool arg_cmp(const char *actual, const char *expected, const char *alternative) 
     return  expected_result || alternative_result;
 }
 
+bool arg_cmp_single(const char *actual, const char *expected) {
+    size_t actual_length = strlen(actual);
+    size_t expected_length = strlen(expected);
+
+    bool expected_result = cmp_sized_strings(actual, expected, actual_length, expected_length);
+
+    return  expected_result;
+}
+
 void print_scaped_string_to_fd(wodo_string_t string, FILE *file) {
     fprintf(file, "\"");
     size_t last_index = 0;
@@ -193,4 +208,63 @@ void print_scaped_string_to_fd(wodo_string_t string, FILE *file) {
         fprintf(file, "%.*s", (int)(string.length - last_index), string.value + last_index);
 
     fprintf(file, "\"");
+}
+
+bool default_task_predicate(wodo_task_t task, Flags *flags) {
+    if (flags == NULL) return true;
+
+    bool matched_any_states = cl_arr_len(flags->state_filter) == 0;
+    bool matched_any_tags = cl_arr_len(flags->tag_filter) == 0;
+
+    wodo_task_state_t task_state = task.state_property.state;
+
+    for (size_t i = 0; i < cl_arr_len(flags->state_filter); i++) {
+        const char *state = flags->state_filter[i];
+
+        size_t state_size = strlen(state);
+
+        if (strncmp(state, "todo", state_size) == 0) {
+            if (task_state == Wodo_Task_State_Todo) {
+                matched_any_states = true;
+                break;
+            }
+        } else if (strncmp(state, "doing", state_size) == 0) {
+            if (task_state == Wodo_Task_State_Doing) {
+                matched_any_states = true;
+                break;
+            }
+        } else if (strncmp(state, "blocked", state_size) == 0) {
+            if (task_state == Wodo_Task_State_Blocked) {
+                matched_any_states = true;
+                break;
+            }
+        } else if (strncmp(state, "done", state_size) == 0) {
+            if (task_state == Wodo_Task_State_Done) {
+                matched_any_states = true;
+                break;
+            }
+        }
+
+        break;
+    }
+
+    wodo_node_t *tags = task.tags_property.node_array;
+
+    for (size_t i = 0; i < cl_arr_len(flags->tag_filter); i++) {
+        const char *tag_filter = flags->tag_filter[i];
+
+        for (size_t j = 0; j < cl_arr_len(tags); j++) {
+            wodo_string_t task_tag = tags[j].string;
+
+            if (strncmp(tag_filter, task_tag.value, task_tag.length) == 0) {
+                matched_any_tags = true;
+
+                break;
+            }
+        }
+
+        if (matched_any_tags) break;
+    }
+
+    return matched_any_states && matched_any_tags;
 }

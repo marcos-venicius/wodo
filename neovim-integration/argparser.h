@@ -10,7 +10,8 @@ typedef enum {
     AK_PARSE_AS_JSON,   // arg1(path) tag_filter(-ft) state_filter(-fs)
     AK_LIST,            // tag_filter(-ft) state_filter(-fs)
     AK_FORMAT,          // arg1(path)
-    AK_RENAME           // arg1(path) arg2(title)
+    AK_RENAME,          // arg1(path) arg2(title)
+    AK_GET_REMINDERS,   //
 } ArgumentKind;
 
 typedef struct {

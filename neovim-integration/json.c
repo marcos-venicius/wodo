@@ -9,71 +9,14 @@
 #include "./io.h"
 #include "./parser.h"
 
-static bool task_match_flags(wodo_task_t task, Flags flags) {
-    bool matched_any_states = cl_arr_len(flags.state_filter) == 0;
-    bool matched_any_tags = cl_arr_len(flags.tag_filter) == 0;
-
-    wodo_task_state_t task_state = task.state_property.state;
-
-    for (size_t i = 0; i < cl_arr_len(flags.state_filter); i++) {
-        const char *state = flags.state_filter[i];
-
-        size_t state_size = strlen(state);
-
-        if (strncmp(state, "todo", state_size) == 0) {
-            if (task_state == Wodo_Task_State_Todo) {
-                matched_any_states = true;
-                break;
-            }
-        } else if (strncmp(state, "doing", state_size) == 0) {
-            if (task_state == Wodo_Task_State_Doing) {
-                matched_any_states = true;
-                break;
-            }
-        } else if (strncmp(state, "blocked", state_size) == 0) {
-            if (task_state == Wodo_Task_State_Blocked) {
-                matched_any_states = true;
-                break;
-            }
-        } else if (strncmp(state, "done", state_size) == 0) {
-            if (task_state == Wodo_Task_State_Done) {
-                matched_any_states = true;
-                break;
-            }
-        }
-
-        break;
-    }
-
-    wodo_node_t *tags = task.tags_property.node_array;
-
-    for (size_t i = 0; i < cl_arr_len(flags.tag_filter); i++) {
-        const char *tag_filter = flags.tag_filter[i];
-
-        for (size_t j = 0; j < cl_arr_len(tags); j++) {
-            wodo_string_t task_tag = tags[j].string;
-
-            if (strncmp(tag_filter, task_tag.value, task_tag.length) == 0) {
-                matched_any_tags = true;
-
-                break;
-            }
-        }
-
-        if (matched_any_tags) break;
-    }
-
-    return matched_any_states && matched_any_tags;
-}
-
-void print_tasks_to_stdout_as_json(wodo_task_t *tasks, Flags flags) {
+void print_tasks_to_stdout_as_json(wodo_task_t *tasks, bool (*predicate)(wodo_task_t, Flags*), Flags *flags) {
     int comma_index = 0;
 
     printf("[");
     for (size_t i = 0; i < cl_arr_len(tasks); i++) {
         wodo_task_t task = tasks[i];
 
-        if (!task_match_flags(task, flags)) continue;
+        if (!predicate(task, flags)) continue;
 
         // separate objects
         if (comma_index > 0) printf(",");
@@ -228,7 +171,7 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks, Flags flags) {
     printf("]");
 }
 
-void print_database_files_to_stdout_as_json(Flags flags) {
+void print_database_files_to_stdout_as_json(bool (*predicate)(wodo_task_t task, Flags*), Flags *flags) {
     int total_count = 0;
     int todo_count = 0;
     int doing_count = 0;
@@ -253,7 +196,7 @@ void print_database_files_to_stdout_as_json(Flags flags) {
         for (size_t i = 0; i < cl_arr_len(tasks); i++) {
             wodo_task_t task = tasks[i];
 
-            if (!task_match_flags(task, flags)) continue;
+            if (!predicate(task, flags)) continue;
 
             matched_any_tasks = true;
 
@@ -307,7 +250,7 @@ void print_database_files_to_stdout_as_json(Flags flags) {
         printf(",");
         {
             printf("\"tasks\":");
-            print_tasks_to_stdout_as_json(tasks, flags);
+            print_tasks_to_stdout_as_json(tasks, predicate, flags);
         }
         printf("}");
 
