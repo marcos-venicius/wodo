@@ -13,7 +13,7 @@ static bool task_match_flags(wodo_task_t task, Flags flags) {
     bool matched_any_states = cl_arr_len(flags.state_filter) == 0;
     bool matched_any_tags = cl_arr_len(flags.tag_filter) == 0;
 
-    wodo_task_state_t task_state = task.state_property.as.state_property;
+    wodo_task_state_t task_state = task.state_property.state;
 
     for (size_t i = 0; i < cl_arr_len(flags.state_filter); i++) {
         const char *state = flags.state_filter[i];
@@ -45,13 +45,13 @@ static bool task_match_flags(wodo_task_t task, Flags flags) {
         break;
     }
 
-    wodo_node_t *tags = task.tags_property.as.tags_property;
+    wodo_node_t *tags = task.tags_property.node_array;
 
     for (size_t i = 0; i < cl_arr_len(flags.tag_filter); i++) {
         const char *tag_filter = flags.tag_filter[i];
 
         for (size_t j = 0; j < cl_arr_len(tags); j++) {
-            wodo_string_t task_tag = tags[j].as.tag;
+            wodo_string_t task_tag = tags[j].string;
 
             if (strncmp(tag_filter, task_tag.value, task_tag.length) == 0) {
                 matched_any_tags = true;
@@ -84,7 +84,7 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks, Flags flags) {
         {
             printf("\"title\":{");
             printf("\"content\":");
-            print_scaped_string_to_fd(task.title.as.title, stdout);
+            print_scaped_string_to_fd(task.title.string, stdout);
             printf(",");
             // location
             {
@@ -102,7 +102,7 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks, Flags flags) {
         {
             printf("\"state\":{");
             printf("\"content\":");
-            switch (task.state_property.as.state_property) {
+            switch (task.state_property.state) {
                 case Wodo_Task_State_Todo: printf("\"todo\""); break;
                 case Wodo_Task_State_Doing: printf("\"doing\""); break;
                 case Wodo_Task_State_Blocked: printf("\"blocked\""); break;
@@ -127,7 +127,7 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks, Flags flags) {
         {
             printf("\"date\":{");
             printf("\"content\":\"");
-            print_wodo_datetime(task.date_property.as.date_property, false);
+            print_wodo_datetime(task.date_property.datetime, false);
             printf("\",");
 
             // location
@@ -145,7 +145,7 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks, Flags flags) {
 
         // tags
         {
-            wodo_node_t *tags = task.tags_property.as.tags_property;
+            wodo_node_t *tags = task.tags_property.node_array;
 
             printf("\"tags\":{");
             // content
@@ -158,7 +158,7 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks, Flags flags) {
                     wodo_node_t tag = tags[i];
 
                     printf("{");
-                    printf("\"content\":\"%.*s\",", (int)tag.as.tag.length, tag.as.tag.value);
+                    printf("\"content\":\"%.*s\",", (int)tag.string.length, tag.string.value);
                     // location
                     {
                         printf("\"location\":{");
@@ -188,7 +188,7 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks, Flags flags) {
         // remind
         {
             printf("\"remind\":{");
-            printf("\"content\":%s,", task.remind_property.as.remind_property ? "true" : "false");
+            printf("\"content\":%s,", task.remind_property.boolean ? "true" : "false");
 
             // location
             {
@@ -209,7 +209,7 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks, Flags flags) {
 
             printf("\"content\":");
 
-            print_scaped_string_to_fd(task.description.as.description, stdout);
+            print_scaped_string_to_fd(task.description.string, stdout);
 
             // location
             if (task.description.location.col != 0) {
@@ -257,7 +257,7 @@ void print_database_files_to_stdout_as_json(Flags flags) {
 
             matched_any_tasks = true;
 
-            switch (task.state_property.as.state_property) {
+            switch (task.state_property.state) {
                 case Wodo_Task_State_Todo:
                     todo_count++;
                     break;

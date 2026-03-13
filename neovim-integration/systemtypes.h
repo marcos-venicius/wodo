@@ -31,23 +31,28 @@ typedef struct wodo_node_t wodo_node_t;
 
 struct wodo_node_t {
     wodo_location_t       location;
+
     union {
-        wodo_string_t     title;
-        wodo_string_t     description;
-        wodo_task_state_t state_property;
-        wodo_node_t       *tags_property; // CL_ARRAY
-        wodo_datetime_t   date_property;
-        bool              remind_property;
-        wodo_string_t     tag;
-    } as;
+        wodo_string_t     string;
+        wodo_task_state_t state;
+        wodo_node_t       *node_array; // CL_ARRAY
+        wodo_datetime_t   datetime;
+        bool              boolean;
+    };
 };
 
 typedef struct {
+    // string_val
     wodo_node_t title;
+    // string_val
     wodo_node_t description;
+    // state
     wodo_node_t state_property;
+    // array<wodo_string_t>
     wodo_node_t tags_property;
+    // datetime_val
     wodo_node_t date_property;
+    // bool_val
     wodo_node_t remind_property;
 } wodo_task_t;
 

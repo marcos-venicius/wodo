@@ -176,8 +176,8 @@ static wodo_node_t *parse_task_tags_property(void) {
 
         wodo_node_t tag = {
             .location = pop_location_snapshot(),
-            .as.tag.value = &content[bot],
-            .as.tag.length = cursor - bot
+            .string.value = &content[bot],
+            .string.length = cursor - bot
         };
 
         cl_arr_push(tags, tag);
@@ -308,8 +308,8 @@ static wodo_task_t parse_task() {
 
     task.title = (wodo_node_t){
         .location = pop_location_snapshot(),
-        .as.title.length = cursor - bot,
-        .as.title.value = &content[bot]
+        .string.length = cursor - bot,
+        .string.value = &content[bot]
     };
 
     // advance until next instruction
@@ -344,7 +344,7 @@ static wodo_task_t parse_task() {
             parsed_state_property = true;
             task.state_property = (wodo_node_t){
                 .location = pop_location_snapshot(),
-                .as.state_property = state
+                .state = state
             };
         } else if (str_slice_eq(s_property_name, s_property_size, "tags")) {
             wodo_node_t *tags = parse_task_tags_property();
@@ -352,7 +352,7 @@ static wodo_task_t parse_task() {
             parsed_tags_property = true;
             task.tags_property = (wodo_node_t){
                 .location = pop_location_snapshot(),
-                .as.tags_property = tags
+                .node_array = tags
             };
         } else if (str_slice_eq(s_property_name, s_property_size, "date")) {
             wodo_datetime_t date = parse_task_date_property();
@@ -360,12 +360,12 @@ static wodo_task_t parse_task() {
             parsed_date_property = true;
             task.date_property = (wodo_node_t){
                 .location = pop_location_snapshot(),
-                .as.date_property = date,
+                .datetime = date,
             };
         } else if (str_slice_eq(s_property_name, s_property_size, "remind")) {
             task.remind_property = (wodo_node_t){
                 .location = pop_location_snapshot(),
-                .as.remind_property = true
+                .boolean = true
             };
         } else {
             parser_error_no_quit("invalid property name '%.*s'", (int)s_property_size, s_property_name);
@@ -384,7 +384,7 @@ static wodo_task_t parse_task() {
     if (!parsed_tags_property)
         task.tags_property = (wodo_node_t){
             .location = {0},
-            .as.tags_property = CL_ARRAY_INIT
+            .node_array = CL_ARRAY_INIT
         };
 
     bot = cursor;
@@ -413,14 +413,14 @@ static wodo_task_t parse_task() {
 
         task.description = (wodo_node_t){
             .location = pop_location_snapshot(),
-            .as.description.value = &content[bot],
-            .as.description.length = description_length
+            .string.value = &content[bot],
+            .string.length = description_length
         };
     } else {
         task.description = (wodo_node_t){
             .location = pop_location_snapshot(),
-            .as.description.value = NULL,
-            .as.description.length = 0
+            .string.value = NULL,
+            .string.length = 0
         };
     }
 

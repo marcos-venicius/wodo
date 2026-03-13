@@ -234,11 +234,11 @@ int format_action(const char *filepath) {
         wodo_task_t task = tasks[i];
 
         printf("%% ");
-        print_trimed_string(task.title.as.title);
+        print_trimed_string(task.title.string);
         printf("\n");
         printf("\n");
         printf(".state ");
-        switch (task.state_property.as.state_property) {
+        switch (task.state_property.state) {
             case Wodo_Task_State_Todo: printf("todo\n"); break;
             case Wodo_Task_State_Doing: printf("doing\n"); break;
             case Wodo_Task_State_Blocked: printf("blocked\n"); break;
@@ -246,25 +246,25 @@ int format_action(const char *filepath) {
             default: assert(0 && "unhandled state during formatting");
         }
         printf(".date  ");
-        print_wodo_datetime(task.date_property.as.date_property, false);
+        print_wodo_datetime(task.date_property.datetime, false);
         printf("\n");
         printf(".tags");
 
-        if (cl_arr_len(task.tags_property.as.tags_property) > 0) {
+        if (cl_arr_len(task.tags_property.node_array) > 0) {
             printf("  ");
-            for (size_t j = 0; j < (cl_arr_len(task.tags_property.as.tags_property)); j++) {
+            for (size_t j = 0; j < (cl_arr_len(task.tags_property.node_array)); j++) {
                 if (j > 0) printf(" ");
 
-                wodo_string_t tag = task.tags_property.as.tags_property[j].as.tag;
+                wodo_string_t tag = task.tags_property.node_array[j].string;
 
                 printf("%.*s", (int)tag.length, tag.value);
             }
         }
         printf("\n");
 
-        if (task.description.as.description.length > 0) {
+        if (task.description.string.length > 0) {
             printf("\n");
-            print_trimed_line_string(task.description.as.description);
+            print_trimed_line_string(task.description.string);
             printf("\n");
         }
     }
