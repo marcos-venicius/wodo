@@ -1,0 +1,382 @@
+#define CL_ARRAY_IMPLEMENTATION
+#include "./database.h"
+#include "./utils.h"
+#include "./clibs/arr.h"
+#include "./crypt.h"
+#include <openssl/sha.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <errno.h>
+#include <assert.h>
+
+
+#ifdef DEV_MODE
+static const char *db_folder_name = ".wodo.dev";
+#else
+static const char *db_folder_name = ".wodo";
+#endif
+
+static const char *file_extension = ".wodo";
+static const char *db_filename = ".wodo.db";
+static const char *db_file_magic_bytes = ".WODO";
+
+static const char *get_database_filepath(void) {
+    const char *user_home_folder = get_user_home_folder();
+
+    char *database_filepath = malloc(strlen(user_home_folder) + strlen(db_folder_name) + strlen(db_filename) + 4);
+
+    snprintf(database_filepath, strlen(user_home_folder) + strlen(db_folder_name) + 2, "%s/%s", user_home_folder, db_folder_name);
+
+    if (!file_exists(database_filepath, true)) {
+        if (mkdir(database_filepath, 0777) != 0) {
+            fprintf(stderr, "error: could not created folder %s due to: %s\n", database_filepath, strerror(errno));
+            exit(1);
+        }
+    }
+
+    snprintf(database_filepath, strlen(user_home_folder) + strlen(db_folder_name) + strlen(db_filename) + 3, "%s/%s/%s", user_home_folder, db_folder_name, db_filename);
+
+    return database_filepath;
+}
+
+static void free_db_file(Database_Db_File *file) {
+    if (file->name != NULL) {
+        free(file->name); 
+        file->name = NULL;
+    }
+
+    if (file->filepath != NULL) {
+        free(file->filepath);
+        file->filepath = NULL;
+    }
+
+    free(file);
+}
+
+const char *database_status_code_string(database_status_code_t status_code) {
+    switch (status_code) {
+        case DATABASE_OK_STATUS_CODE: return "OK";
+        case DATABASE_NOT_FOUND_STATUS_CODE: return "NOT FOUND";
+        case DATABASE_CONFLICT_STATUS_CODE: return "CONFLICTING KEY";
+        case DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE: return "DATABASE FILE CORRUPTED";
+        default: return "UNKNOWN";
+    }
+}
+
+database_status_code_t load_database_v1(FILE *file) {
+    uint64_t length;
+
+    if (fread(&length, sizeof(uint64_t), 1, file) != 1) {
+        return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+    };
+
+    Database_Db_File *db_file;
+
+    for (uint64_t i = 0; i < length; ++i) {
+        db_file = malloc(sizeof(Database_Db_File));
+
+        db_file->name = NULL;
+        db_file->filepath = NULL;
+        db_file->deleted = false;
+        db_file->remind = false;
+
+        uint64_t name_size;
+
+        if (fread(&name_size, sizeof(uint64_t), 1, file) != 1) {
+            goto corrupted_db_error;
+        }
+
+        if (name_size == 0) {
+            goto corrupted_db_error;
+        }
+
+        db_file->name = malloc(name_size);
+
+        if (fread(db_file->name, sizeof(char), name_size, file) != name_size) {
+            goto corrupted_db_error;
+        }
+
+        uint64_t path_size;
+
+        if (fread(&path_size, sizeof(uint64_t), 1, file) != 1) {
+            goto corrupted_db_error;
+        }
+
+        if (path_size == 0) {
+            goto corrupted_db_error;
+        }
+
+        db_file->filepath = malloc(path_size);
+
+        if (fread(db_file->filepath, sizeof(char), path_size, file) != path_size) {
+            goto corrupted_db_error;
+        }
+
+        uint8_t remind = 0;
+
+        if (fread(&remind, sizeof(uint8_t), 1, file) != 1) {
+            goto corrupted_db_error;
+        }
+
+        db_file->remind = remind == 1;
+
+        cl_arr_push(global_database.files, db_file);
+    }
+
+    fclose(file);
+
+    return DATABASE_OK_STATUS_CODE;
+corrupted_db_error:
+    fclose(file);
+    free_db_file(db_file);
+    cl_arr_free(global_database.files);
+    return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+}
+
+database_status_code_t read_database(FILE *file) {
+    if (fread(&global_database.version, sizeof(short), 1, file) != 1) {
+        return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+    }
+
+    // this version is only possible without the magic bytes
+    if (global_database.version == DBV_0) {
+        return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+    }
+
+    switch (global_database.version) {
+        case DBV_1: return load_database_v1(file);
+        default: break;
+    }
+
+    // invalid file version
+    return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+}
+
+database_status_code_t database_load() {
+    const char *database_filepath = get_database_filepath();
+
+    if (!file_exists(database_filepath, false)) {
+        return DATABASE_OK_STATUS_CODE;
+    }
+
+    FILE *file = fopen(database_filepath, "rb");
+
+    if (file == NULL) {
+        fprintf(stderr, "could not open database file: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    char magic_bytes[6] = {0}; // .WODO\0
+
+    if (fread(&magic_bytes, sizeof(char), 6, file) != 6) {
+        return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+    }
+
+    // load new database format
+    if (strncmp(magic_bytes, db_file_magic_bytes, 5) == 0) {
+        return read_database(file);
+    }
+
+    if (fseek(file, 0L, SEEK_SET) != 0) {
+        fclose(file);
+
+        return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+    }
+
+    // load old database format for retro-compatibility
+    uint64_t length;
+    
+    if (fread(&length, sizeof(uint64_t), 1, file) != 1) {
+        return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+    };
+
+    for (uint64_t i = 0; i < length; ++i) {
+        Database_Db_File *db_file = malloc(sizeof(Database_Db_File));
+
+        db_file->name = NULL;
+        db_file->filepath = NULL;
+        db_file->deleted = false;
+        db_file->remind = false;
+
+        uint64_t name_size;
+
+        if (fread(&name_size, sizeof(uint64_t), 1, file) != 1) {
+            fclose(file);
+            free_db_file(db_file);
+            cl_arr_free(global_database.files);
+            return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+        }
+
+        if (name_size == 0) {
+            fclose(file);
+            free_db_file(db_file);
+            cl_arr_free(global_database.files);
+            return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+        }
+
+        db_file->name = malloc(name_size);
+
+        if (fread(db_file->name, sizeof(char), name_size, file) != name_size) {
+            fclose(file);
+            free_db_file(db_file);
+            cl_arr_free(global_database.files);
+            return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+        }
+
+        uint64_t path_size;
+
+        if (fread(&path_size, sizeof(uint64_t), 1, file) != 1) {
+            fclose(file);
+            free_db_file(db_file);
+            cl_arr_free(global_database.files);
+            return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+        }
+
+        if (path_size == 0) {
+            fclose(file);
+            free_db_file(db_file);
+            cl_arr_free(global_database.files);
+            return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+        }
+
+        db_file->filepath = malloc(path_size);
+
+        if (fread(db_file->filepath, sizeof(char), path_size, file) != path_size) {
+            fclose(file);
+            free_db_file(db_file);
+            cl_arr_free(global_database.files);
+            return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+        }
+
+        cl_arr_push(global_database.files, db_file);
+    }
+
+    fclose(file);
+
+    return DATABASE_OK_STATUS_CODE;
+}
+
+static void save_database_v1(FILE *file) {
+    short version = DBV_1;
+
+    // magic bytes + \0
+    fwrite(db_file_magic_bytes, sizeof(char), strlen(db_file_magic_bytes) + 1, file);
+    // database version
+    fwrite(&version, sizeof(short), 1, file);
+
+    size_t length = 0;
+
+    for (size_t i = 0; i < cl_arr_len(global_database.files); i++) {
+        Database_Db_File *it = global_database.files[i];
+
+        if (it->deleted) continue;
+
+        length++;
+    }
+
+    fwrite(&length, sizeof(uint64_t), 1, file);
+
+    for (size_t i = 0; i < cl_arr_len(global_database.files); i++) {
+        Database_Db_File *it = global_database.files[i];
+
+        if (it->deleted) continue;
+        uint64_t name_size = strlen(it->name) + 1; // needs to save the null terminator
+        uint64_t path_size = strlen(it->filepath) + 1; // needs to save the null terminator
+        uint8_t remind = it->remind ? 1 : 0;
+
+        fwrite(&name_size, sizeof(uint64_t), 1, file);
+        fwrite(it->name, sizeof(char), name_size, file);
+        fwrite(&path_size, sizeof(uint64_t), 1, file);
+        fwrite(it->filepath, sizeof(char), path_size, file);
+        fwrite(&remind, sizeof(uint8_t), 1, file);
+    }
+}
+
+void database_save() {
+    const char *database_filepath = get_database_filepath();
+
+    FILE *file = fopen(database_filepath, "wb");
+
+    if (file == NULL) {
+        fprintf(stderr, "could not open database file: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    switch (global_database.version) {
+        case DBV_0: save_database_v1(file); break; // I can upgrade to v1 without problems (secure update)
+        case DBV_1: save_database_v1(file); break;
+    }
+
+    fclose(file);
+}
+
+void database_free() {
+    for (size_t i = 0; i < cl_arr_len(global_database.files); i++) {
+        Database_Db_File *it = global_database.files[i];
+
+        free_db_file(it);
+    };
+
+    cl_arr_free(global_database.files);
+}
+
+database_status_code_t database_get_file_by_filepath(Database_Db_File **out, const char *filepath) {
+    for (size_t i = 0; i < cl_arr_len(global_database.files); i++) {
+        Database_Db_File *it = global_database.files[i];
+
+        if (it->deleted) continue;
+
+        if (strncmp(filepath, it->filepath, strlen(filepath)) == 0) {
+            if (out != NULL)
+                *out = it;
+
+            return DATABASE_OK_STATUS_CODE;
+        }
+    }
+
+    return DATABASE_NOT_FOUND_STATUS_CODE;
+}
+
+database_status_code_t database_add_file(Database_Db_File *file) {
+    for (size_t i = 0; i < cl_arr_len(global_database.files); i++) {
+        Database_Db_File *it = global_database.files[i];
+        if (it->deleted) continue;
+
+        if (strncmp(file->filepath, it->filepath, strlen(it->filepath)) == 0) {
+            return DATABASE_CONFLICT_STATUS_CODE;
+        }
+    };
+
+    cl_arr_push(global_database.files, file);
+
+    return DATABASE_OK_STATUS_CODE;
+}
+
+char *get_unix_filepath(const char *name, size_t name_size) {
+    const char *user_home_folder = get_user_home_folder();
+    unsigned char *hash = hash_bytes(name, name_size);
+    unsigned long timestamp = get_current_timestamp();
+    char *filepath = malloc(256);
+
+    snprintf(filepath, 256, "%s/%s/%s-%lu%s", user_home_folder, db_folder_name, hash, timestamp, file_extension);
+
+    free(hash);
+
+    return filepath;
+}
+
+void database_delete_file(Database_Db_File *file)
+{
+    file->deleted = true;
+}
+
+void database_rename_file(Database_Db_File *file, char *name)
+{
+    size_t name_size = strlen(name);
+
+    memcpy(file->name, name, name_size);
+
+    file->name[name_size] = '\0';
+}

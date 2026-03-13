@@ -1,45 +1,62 @@
 # WODO
 
-_Wodo_ is a todo list tracking system vim-based.
+_Wodo_ is a vim-based task management system.
 
-You can create `.todo.md` files wherever you want and just call `wodo add <title> /path/to/file` and that's it.
+<img width="1289" height="842" alt="image" src="https://github.com/user-attachments/assets/a1ec1ffc-6963-4435-a1fa-f447c83f7e6e" />
 
-Everytime you want to check all of your todos you can just do `wodo view`, this will list every todo file you have, parse and display it to you.
+> [!WARNING]
+> **It's currently in development, it may have some bugs**
 
-To use it, you need to add some configurations to vim:
+## Dependencies
 
-**requires you to have openssl**
+- [Openssl Lib for hases](https://www.openssl.org/)
+- [Clang +14](https://pt.wikipedia.org/wiki/Clang)
 
-[Check out the vim configs you need](./vim/config.vim)
+## Building + Installing + Nvim configuring + Uninstalling
 
-This configurations will allow you to type:
+**To build the project you just need run one command:**
 
-- `<leader>t` to put a task in `todo` mode
-- `<leader>i` to put a task in `progress` mode
-- `<leader>c` to put a task in `done` mode
-- `<leader>a` to create a new task in a blank line
+```bash
+make BUILD=1
+```
 
-Then, you can just do `wodo add <title> /path/to/file`.
+This will create a native executable inside `bin` folder.
 
-After do this, everytime you update this file the wodo will be able to see this modifications and when you do `wodo view` you will get all your todo files with the updates states and see where everyone is and the state of which one.
+**To install it, you can just run:**
 
-**Check the `examples` folder to a todo file example**
+```bash
+sudo make install # requires sudo if you want to use the default prefix /usr/local/bin
+```
 
-## Info
+You can set a prefix where the `wodo` binary goes by using the env `PREFIX`.
+By default, the prefix is going to be `/usr/local/bin`.
 
-Maybe I'll update this project to allow you to:
+**Uninstalling:**
 
-- allow modify tasks via cli
-    - change state of a task
-    - remove a task
-    - add a new task (by opening vim tabs)
-    - edit a task (by opening vim tabs)
-- validate time ranges
-- have a calendar view
+```bash
+sudo make uninstall # requires sudo if you want to use the default prefix /usr/local/bin
+```
 
-and some other stuff.
+> [!WARNING]
+> **It will update your neovim configs**
+> This nvim configuration is based on [my own neovim config](https://github.com/marcos-venicius/config-manager).
 
-**And of course, I need to refactor this mess of almost _2000_ lines main.c file (now) :)**
+So, if you don't have the same, you can configure it manually.
+
+By installing using `make install`, those operations are going to be done on your neovim configurations:
+
+```bash
+ln -sf $(PWD)/nvim/ftdetect/wodo.lua $(USER_HOME)/.config/nvim/ftdetect/wodo.lua
+ln -sf $(PWD)/nvim/syntax/wodo.vim $(USER_HOME)/.config/nvim/syntax/wodo.vim
+ln -sf $(PWD)/nvim/lua/config/wodo.lua $(USER_HOME)/.config/nvim/lua/config/wodo.lua
+```
+
+> [!INFO]
+> I'm using Snacks plugin default notifier for notifications and telescope for pickers
+
+## Formatting files with `<leader>wf`
+
+https://github.com/user-attachments/assets/fb920f90-5fe5-4c13-aebd-a85c8be5d13d
 
 ### ✨ It's comming a brand new wodo file format ✨
 
