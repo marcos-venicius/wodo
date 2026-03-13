@@ -47,6 +47,17 @@ static inline wodo_location_t pop_location_snapshot() {
     return location_snapshots.stack[--location_snapshots.length];
 }
 
+static inline void parser_error_no_quit(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    fprintf(stderr, "%s:%d:%d error: ", filename, line, col);
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+
+    va_end(args);
+}
+
 static inline void parser_error(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -56,6 +67,7 @@ static inline void parser_error(const char *fmt, ...) {
     printf("\n");
 
     va_end(args);
+
     exit(1);
 }
 
@@ -356,7 +368,7 @@ static wodo_task_t parse_task() {
                 .as.date_property = date,
             };
         } else {
-            parser_error("invalid property name '%.*s'\n", (int)s_property_size, s_property_name);
+            parser_error_no_quit("invalid property name '%.*s'", (int)s_property_size, s_property_name);
         }
 
         // skip empty lines and white spaces
