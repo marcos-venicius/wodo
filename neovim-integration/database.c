@@ -20,6 +20,7 @@ static const char *db_folder_name = ".wodo";
 
 static const char *file_extension = ".wodo";
 static const char *db_filename = ".wodo.db";
+static const char *db_file_magic_bytes = ".WODO";
 
 static const char *get_database_filepath(void) {
     const char *user_home_folder = get_user_home_folder();
@@ -64,6 +65,95 @@ const char *database_status_code_string(database_status_code_t status_code) {
     }
 }
 
+database_status_code_t load_database_v1(FILE *file) {
+    uint64_t length;
+
+    if (fread(&length, sizeof(uint64_t), 1, file) != 1) {
+        return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+    };
+
+    Database_Db_File *db_file;
+
+    for (uint64_t i = 0; i < length; ++i) {
+        db_file = malloc(sizeof(Database_Db_File));
+
+        db_file->name = NULL;
+        db_file->filepath = NULL;
+        db_file->deleted = false;
+        db_file->remind = false;
+
+        uint64_t name_size;
+
+        if (fread(&name_size, sizeof(uint64_t), 1, file) != 1) {
+            goto corrupted_db_error;
+        }
+
+        if (name_size == 0) {
+            goto corrupted_db_error;
+        }
+
+        db_file->name = malloc(name_size);
+
+        if (fread(db_file->name, sizeof(char), name_size, file) != name_size) {
+            goto corrupted_db_error;
+        }
+
+        uint64_t path_size;
+
+        if (fread(&path_size, sizeof(uint64_t), 1, file) != 1) {
+            goto corrupted_db_error;
+        }
+
+        if (path_size == 0) {
+            goto corrupted_db_error;
+        }
+
+        db_file->filepath = malloc(path_size);
+
+        if (fread(db_file->filepath, sizeof(char), path_size, file) != path_size) {
+            goto corrupted_db_error;
+        }
+
+        uint8_t remind = 0;
+
+        if (fread(&remind, sizeof(uint8_t), 1, file) != 1) {
+            goto corrupted_db_error;
+        }
+
+        db_file->remind = remind == 1;
+
+        cl_arr_push(global_database.files, db_file);
+    }
+
+    fclose(file);
+
+    return DATABASE_OK_STATUS_CODE;
+corrupted_db_error:
+    fclose(file);
+    free_db_file(db_file);
+    cl_arr_free(global_database.files);
+    return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+}
+
+database_status_code_t read_database(FILE *file) {
+    if (fread(&global_database.version, sizeof(short), 1, file) != 1) {
+        return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+    }
+
+    // this version is only possible without the magic bytes
+    if (global_database.version == DBV_0) {
+        return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+    }
+
+    switch (global_database.version) {
+        case DBV_1: return load_database_v1(file);
+        default: break;
+    }
+
+    // invalid file version
+    return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+}
+
 database_status_code_t database_load() {
     const char *database_filepath = get_database_filepath();
 
@@ -78,6 +168,26 @@ database_status_code_t database_load() {
         exit(1);
     }
 
+    char magic_bytes[6] = {0}; // .WODO\0
+
+    if (fread(&magic_bytes, sizeof(char), 5, file) != 5) {
+        return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+    }
+
+    // load new database format
+    if (strncmp(magic_bytes, db_file_magic_bytes, 5) == 0) {
+        fclose(file);
+
+        return read_database(file);
+    }
+
+    if (fseek(file, 0L, SEEK_SET) != 0) {
+        fclose(file);
+
+        return DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE;
+    }
+
+    // load old database format for retro-compatibility
     uint64_t length;
     
     if (fread(&length, sizeof(uint64_t), 1, file) != 1) {
@@ -90,6 +200,7 @@ database_status_code_t database_load() {
         db_file->name = NULL;
         db_file->filepath = NULL;
         db_file->deleted = false;
+        db_file->remind = false;
 
         uint64_t name_size;
 
