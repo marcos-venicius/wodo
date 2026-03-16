@@ -113,6 +113,9 @@ char *join_paths(const char *text, ...) {
         }
     }
 
+    resulting_path = realloc(resulting_path, string_size + 1);
+    resulting_path[string_size] = '\0';
+
     return resulting_path;
 }
 
