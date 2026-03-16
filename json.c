@@ -9,7 +9,7 @@
 #include "./io.h"
 #include "./parser.h"
 
-void print_tasks_to_stdout_as_json(wodo_task_t *tasks, bool (*predicate)(wodo_task_t, Flags*), Flags *flags) {
+void print_tasks_to_stdout_as_json(wodo_task_t *tasks, bool (*predicate)(wodo_task_t, Flags), Flags flags) {
     int comma_index = 0;
 
     printf("[");
@@ -171,7 +171,7 @@ void print_tasks_to_stdout_as_json(wodo_task_t *tasks, bool (*predicate)(wodo_ta
     printf("]");
 }
 
-void print_database_files_to_stdout_as_json(bool (*predicate)(wodo_task_t task, Flags*), Flags *flags) {
+void print_database_files_to_stdout_as_json(bool (*predicate)(wodo_task_t task, Flags), Flags flags) {
     int total_count = 0;
     int todo_count = 0;
     int doing_count = 0;
@@ -191,7 +191,7 @@ void print_database_files_to_stdout_as_json(bool (*predicate)(wodo_task_t task, 
 
         wodo_task_t *tasks = parse_tasks(it->filepath, content, length);
 
-        bool matched_any_tasks = false;
+        bool matched_any_tasks = cl_arr_len(tasks) == 0;
 
         for (size_t i = 0; i < cl_arr_len(tasks); i++) {
             wodo_task_t task = tasks[i];

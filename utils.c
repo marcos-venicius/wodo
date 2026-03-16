@@ -107,9 +107,11 @@ char *join_paths(const char *text, ...) {
                 }
             } break;
             default: {
-                free(resulting_path);
-                return NULL;
-            } 
+                string_size++;
+
+                resulting_path = realloc(resulting_path, string_size);
+                resulting_path[string_size - 1] = text[i];
+            } break;
         }
     }
 
@@ -215,16 +217,16 @@ void print_scaped_string_to_fd(wodo_string_t string, FILE *file) {
     fprintf(file, "\"");
 }
 
-bool default_task_predicate(wodo_task_t task, Flags *flags) {
-    if (flags == NULL) return true;
+bool default_task_predicate(wodo_task_t task, Flags flags) {
+    bool matched_any_states = cl_arr_len(flags.state_filter) == 0;
+    bool matched_any_tags = cl_arr_len(flags.tag_filter) == 0;
 
-    bool matched_any_states = cl_arr_len(flags->state_filter) == 0;
-    bool matched_any_tags = cl_arr_len(flags->tag_filter) == 0;
+    if (matched_any_states && matched_any_tags) return true;
 
     wodo_task_state_t task_state = task.state_property.state;
 
-    for (size_t i = 0; i < cl_arr_len(flags->state_filter); i++) {
-        const char *state = flags->state_filter[i];
+    for (size_t i = 0; i < cl_arr_len(flags.state_filter); i++) {
+        const char *state = flags.state_filter[i];
 
         size_t state_size = strlen(state);
 
@@ -255,8 +257,8 @@ bool default_task_predicate(wodo_task_t task, Flags *flags) {
 
     wodo_node_t *tags = task.tags_property.node_array;
 
-    for (size_t i = 0; i < cl_arr_len(flags->tag_filter); i++) {
-        const char *tag_filter = flags->tag_filter[i];
+    for (size_t i = 0; i < cl_arr_len(flags.tag_filter); i++) {
+        const char *tag_filter = flags.tag_filter[i];
 
         for (size_t j = 0; j < cl_arr_len(tags); j++) {
             wodo_string_t task_tag = tags[j].string;

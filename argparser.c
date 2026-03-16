@@ -18,6 +18,9 @@ static char *shift(int *argc, char ***argv) {
 Arguments *parse_arguments(int argc, char **argv) {
     Arguments *args = calloc(sizeof(Arguments), 1);
 
+    args->flags.state_filter = NULL;
+    args->flags.tag_filter = NULL;
+
     char *arg;
 
     args->program_name = getarg();
