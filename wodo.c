@@ -14,6 +14,15 @@ Database global_database = {0};
 int main(int argc, char **argv) {
     int return_code = 0;
 
+    Arguments *args = parse_arguments(argc, argv);
+
+    if (args == NULL)
+        defer(1);
+
+    if (args->kind == AK_INIT) {
+        defer(init_repository_action());
+    }
+
     database_status_code_t status_code;
 
     if ((status_code = load_wodo_database_working_directory()) != DATABASE_OK_STATUS_CODE) {
@@ -27,11 +36,6 @@ int main(int argc, char **argv) {
         return status_code;
     }
 
-    Arguments *args = parse_arguments(argc, argv);
-
-    if (args == NULL)
-        defer(1);
-
     switch (args->kind) {
         case AK_ADD_PATH: return_code = add_path_action(args->arg1, args->arg2); break;
         case AK_ADD: return_code = add_action(args->arg1); break;
@@ -41,7 +45,6 @@ int main(int argc, char **argv) {
         case AK_FORMAT: return_code = format_action(args->arg1); break;
         case AK_RENAME: return_code = rename_action(args->arg1, args->arg2); break;
         case AK_GET_REMINDERS: return_code = get_reminders_action(); break;
-        case AK_INIT: return_code = init_repository_action(); break;
         default: {
             usage(stderr, args->program_name, "invalid command line options");
 

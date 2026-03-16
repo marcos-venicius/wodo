@@ -192,6 +192,7 @@ database_status_code_t database_load() {
         fprintf(stderr, "could not open database file: %s\n", strerror(errno));
         exit(1);
     }
+    printf("reading from db: %s\n", wodo_current_working_directory_db);
 
     char magic_bytes[6] = {0}; // .WODO\0
 
