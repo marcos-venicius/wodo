@@ -3,8 +3,8 @@
 #include <unistd.h>
 #include <assert.h>
 #include <stdio.h>
-#include "./visualizer.h"
-#include "./date.h"
+#include "visualizer.h"
+#include "date.h"
 
 void print_wodo_datetime(wodo_datetime_t timezoned_datetime, bool simple)
 {

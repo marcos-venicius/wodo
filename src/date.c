@@ -1,5 +1,5 @@
 #include <time.h>
-#include "./date.h"
+#include "date.h"
 
 static const int MAX_TIMEZONE_OFFSET = 14 * 60;
 

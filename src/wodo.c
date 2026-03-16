@@ -1,8 +1,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "./database.h"
-#include "./actions.h"
+#include "database.h"
+#include "actions.h"
 
 #define defer(code) do { return_code = code; goto end; } while (0)
 

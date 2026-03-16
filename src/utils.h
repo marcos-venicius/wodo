@@ -5,8 +5,8 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <time.h>
-#include "./argparser.h"
-#include "./systemtypes.h"
+#include "argparser.h"
+#include "systemtypes.h"
 
 const char *get_user_home_folder(void);
 bool file_exists(const char *filepath, bool is_folder);
