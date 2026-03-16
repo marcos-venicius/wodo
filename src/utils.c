@@ -1,20 +1,19 @@
 #define CL_ARRAY_IMPLEMENTATION
 
 #include <pwd.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <locale.h>
-#include <bits/types/mbstate_t.h>
 #include <wchar.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include "./utils.h"
-#include "./clibs/arr.h"
-#include <stdbool.h>
-#include "./systemtypes.h"
-#include "./argparser.h"
+#include "utils.h"
+#include "arr.h"
+#include "systemtypes.h"
+#include "argparser.h"
 
 const char *get_user_home_folder(void) {
     const char *home = getenv("HOME");

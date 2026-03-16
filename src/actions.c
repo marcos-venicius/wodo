@@ -2,17 +2,17 @@
 
 #include <string.h>
 #include <errno.h>
-#include "./io.h"
 #include <stdio.h>
-#include "./json.h"
-#include "./io.h"
-#include "./database.h"
+#include "io.h"
+#include "json.h"
+#include "io.h"
+#include "database.h"
 #include "visualizer.h"
-#include "./parser.h"
-#include "./actions.h"
+#include "parser.h"
+#include "actions.h"
 #include "utils.h"
-#include "./clibs/arr.h"
-#include "./crossplatformops.h"
+#include "arr.h"
+#include "crossplatformops.h"
 
 int add_path_action(const char *name, const char *filepath) {
     char *abs_path = realpath(filepath, NULL);

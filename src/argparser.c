@@ -1,9 +1,9 @@
 #define CL_ARRAY_IMPLEMENTATION
 #include <stdlib.h>
 #include <stdarg.h>
-#include "./argparser.h"
-#include "./utils.h"
-#include "./clibs/arr.h"
+#include "argparser.h"
+#include "utils.h"
+#include "arr.h"
 
 static char *shift(int *argc, char ***argv) {
     if (*argc == 0) return NULL;

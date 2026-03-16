@@ -8,11 +8,11 @@
 #include <assert.h>
 #include <unistd.h>
 #include <libgen.h>
-#include "./database.h"
-#include "./utils.h"
-#include "./clibs/arr.h"
-#include "./crypt.h"
-#include "./crossplatformops.h"
+#include "database.h"
+#include "utils.h"
+#include "arr.h"
+#include "crypt.h"
+#include "crossplatformops.h"
 
 
 #ifdef DEV_MODE

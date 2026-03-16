@@ -1,13 +1,13 @@
 #define CL_ARRAY_IMPLEMENTATION
 #include <string.h>
 #include <stdio.h>
-#include "./json.h"
-#include "./clibs/arr.h"
-#include "./visualizer.h"
-#include "./database.h"
-#include "./utils.h"
-#include "./io.h"
-#include "./parser.h"
+#include "json.h"
+#include "arr.h"
+#include "visualizer.h"
+#include "database.h"
+#include "utils.h"
+#include "io.h"
+#include "parser.h"
 
 void print_tasks_to_stdout_as_json(wodo_task_t *tasks, bool (*predicate)(wodo_task_t, Flags), Flags flags) {
     int comma_index = 0;

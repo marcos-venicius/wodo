@@ -6,9 +6,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include "./parser.h"
-#include "./clibs/arr.h"
-#include "./date.h"
+#include "parser.h"
+#include "arr.h"
+#include "date.h"
 
 #define task_beginning_character_descriptor '%'
 #define property_beginning_character_descriptor '.'
