@@ -99,10 +99,12 @@ char *join_paths(const char *text, ...) {
                 resulting_path[string_size - 1] = ' ';
             } break;
             case '/': {
-                string_size++;
+                if (resulting_path[string_size - 1] != '/') {
+                    string_size++;
 
-                resulting_path = realloc(resulting_path, string_size);
-                resulting_path[string_size - 1] = '/';
+                    resulting_path = realloc(resulting_path, string_size);
+                    resulting_path[string_size - 1] = '/';
+                }
             } break;
             default: {
                 free(resulting_path);

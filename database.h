@@ -9,6 +9,8 @@
 #define DATABASE_NOT_FOUND_STATUS_CODE 1
 #define DATABASE_CONFLICT_STATUS_CODE 2
 #define DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE 3
+#define DATABASE_WODO_FOLDER_NOT_FOUND 4
+#define DATABASE_ERRNO 5
 
 #define DBV_0 0 // old format (no version and no magic bytes)
 #define DBV_1 1 // new format (with magic bytes and version)
@@ -37,8 +39,11 @@ typedef uint8_t database_status_code_t;
  **/
 extern Database global_database;
 
+database_status_code_t load_wodo_database_working_directory();
 // TODO: maybe in the future, do not load the entire database in memory
 database_status_code_t database_load();
+char *database_init(const char *base_path);
+bool has_repository_at(const char *base_path);
 void database_save();
 void database_free();
 database_status_code_t database_get_file_by_filepath(Database_Db_File **out, const char *filepath);

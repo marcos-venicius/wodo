@@ -12,6 +12,7 @@
 #include "./actions.h"
 #include "utils.h"
 #include "./clibs/arr.h"
+#include "./crossplatformops.h"
 
 int add_path_action(const char *name, const char *filepath) {
     char *abs_path = realpath(filepath, NULL);
@@ -311,4 +312,26 @@ int get_reminders_action() {
     print_database_files_to_stdout_as_json(get_reminders_action_task_predicate, NULL);
 
     return 0;
+}
+
+int init_repository_action() {
+    char base_path_buffer[FILENAME_MAX];
+
+    if (GetCurrentDir(base_path_buffer, sizeof(base_path_buffer)) == NULL) {
+        fprintf(stderr, "error: could not get current working directory: %s\n", strerror(errno));
+
+        return DATABASE_ERRNO;
+    }
+
+    if (has_repository_at(base_path_buffer)) {
+        printf("You already have a Wodo repository at %s\n", base_path_buffer);
+
+        return DATABASE_OK_STATUS_CODE;
+    }
+
+    char *initialized_dir = database_init(base_path_buffer);
+
+    printf("Initialized empty Wodo repository in %s\n", initialized_dir);
+
+    return DATABASE_OK_STATUS_CODE;
 }

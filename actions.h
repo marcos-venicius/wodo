@@ -12,5 +12,6 @@ int list_action(Flags flags);
 int format_action(const char *filepath);
 int rename_action(const char *filepath, char *title);
 int get_reminders_action();
+int init_repository_action();
 
 #endif // !_WODO_ACTIONS_H_

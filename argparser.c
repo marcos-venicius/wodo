@@ -104,6 +104,8 @@ Arguments *parse_arguments(int argc, char **argv) {
             args->arg1 = value;
         } else if (arg_cmp_single(arg, "reminders")) {
             args->kind = AK_GET_REMINDERS;
+        } else if (arg_cmp_single(arg, "init")) {
+            args->kind = AK_INIT;
         } else if (arg_cmp(arg, "--filter-tag", "-ft")) {
             char *value = getarg();
 
@@ -151,6 +153,10 @@ void usage(FILE *stream, const char *program_name, char *error_message, ...) {
 #endif
 
     fprintf(stream, "Usage: %s [action] [arguments] [flags]\n\n", program_name);
+
+    // --- SYSTEM MANAGEMENT ---
+    fprintf(stream, "System management:\n");
+    fprintf(stream, "  init                          Init a repository\n\n");
 
     // --- FILE MANAGEMENT GROUP ---
     fprintf(stream, "File Management:\n");

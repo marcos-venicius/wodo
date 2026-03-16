@@ -1,8 +1,4 @@
 #define CL_ARRAY_IMPLEMENTATION
-#include "./database.h"
-#include "./utils.h"
-#include "./clibs/arr.h"
-#include "./crypt.h"
 #include <openssl/sha.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,6 +6,13 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
+#include <unistd.h>
+#include <libgen.h>
+#include "./database.h"
+#include "./utils.h"
+#include "./clibs/arr.h"
+#include "./crypt.h"
+#include "./crossplatformops.h"
 
 
 #ifdef DEV_MODE
@@ -21,24 +24,50 @@ static const char *db_folder_name = ".wodo";
 static const char *file_extension = ".wodo";
 static const char *db_filename = ".wodo.db";
 static const char *db_file_magic_bytes = ".WODO";
+static char *wodo_current_working_directory = NULL;
+static char *wodo_current_working_directory_db = NULL;
 
-static const char *get_database_filepath(void) {
-    const char *user_home_folder = get_user_home_folder();
+bool has_repository_at(const char *base_path) {
+    char *wodo_folder = join_paths("%s/%s", base_path, db_folder_name);
 
-    char *database_filepath = malloc(strlen(user_home_folder) + strlen(db_folder_name) + strlen(db_filename) + 4);
+    return file_exists(wodo_folder, true);
+}
 
-    snprintf(database_filepath, strlen(user_home_folder) + strlen(db_folder_name) + 2, "%s/%s", user_home_folder, db_folder_name);
+database_status_code_t load_wodo_database_working_directory() {
+    char current_dir_buffer[FILENAME_MAX];
 
-    if (!file_exists(database_filepath, true)) {
-        if (mkdir(database_filepath, 0777) != 0) {
-            fprintf(stderr, "error: could not created folder %s due to: %s\n", database_filepath, strerror(errno));
-            exit(1);
+    if (GetCurrentDir(current_dir_buffer, sizeof(current_dir_buffer)) == NULL) {
+        return DATABASE_WODO_FOLDER_NOT_FOUND;
+    }
+
+    char *base_path = strdup(current_dir_buffer);
+
+    while (true) {
+        char *wodo_folder = join_paths("%s/%s", base_path, db_folder_name);
+
+        if (file_exists(wodo_folder, true)) {
+            wodo_current_working_directory = wodo_folder;
+            wodo_current_working_directory_db = join_paths("%s/%s", wodo_folder, db_filename);
+
+            return DATABASE_OK_STATUS_CODE;
+        }
+
+        free(wodo_folder);
+
+        size_t previous_length = strlen(base_path);
+
+        base_path = dirname(base_path);
+
+        size_t current_length = strlen(base_path);
+
+        if (previous_length == current_length) {
+            free(base_path);
+
+            return DATABASE_WODO_FOLDER_NOT_FOUND;
         }
     }
 
-    snprintf(database_filepath, strlen(user_home_folder) + strlen(db_folder_name) + strlen(db_filename) + 3, "%s/%s/%s", user_home_folder, db_folder_name, db_filename);
-
-    return database_filepath;
+    return DATABASE_WODO_FOLDER_NOT_FOUND;
 }
 
 static void free_db_file(Database_Db_File *file) {
@@ -57,11 +86,13 @@ static void free_db_file(Database_Db_File *file) {
 
 const char *database_status_code_string(database_status_code_t status_code) {
     switch (status_code) {
-        case DATABASE_OK_STATUS_CODE: return "OK";
-        case DATABASE_NOT_FOUND_STATUS_CODE: return "NOT FOUND";
-        case DATABASE_CONFLICT_STATUS_CODE: return "CONFLICTING KEY";
-        case DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE: return "DATABASE FILE CORRUPTED";
-        default: return "UNKNOWN";
+        case DATABASE_OK_STATUS_CODE: return "ok";
+        case DATABASE_NOT_FOUND_STATUS_CODE: return "not found";
+        case DATABASE_CONFLICT_STATUS_CODE: return "conflicting key";
+        case DATABASE_CORRUPTED_DATABASE_FILE_STATUS_CODE: return "database file corrupted";
+        case DATABASE_WODO_FOLDER_NOT_FOUND: return "not a wodo repository (or any of the parent directories): .wodo";
+        case DATABASE_ERRNO: return "errno";
+        default: return "unknown";
     }
 }
 
@@ -155,13 +186,7 @@ database_status_code_t read_database(FILE *file) {
 }
 
 database_status_code_t database_load() {
-    const char *database_filepath = get_database_filepath();
-
-    if (!file_exists(database_filepath, false)) {
-        return DATABASE_OK_STATUS_CODE;
-    }
-
-    FILE *file = fopen(database_filepath, "rb");
+    FILE *file = fopen(wodo_current_working_directory_db, "rb");
 
     if (file == NULL) {
         fprintf(stderr, "could not open database file: %s\n", strerror(errno));
@@ -294,10 +319,22 @@ static void save_database_v1(FILE *file) {
     }
 }
 
-void database_save() {
-    const char *database_filepath = get_database_filepath();
+char *database_init(const char *base_path) {
+    wodo_current_working_directory = join_paths("%s/%s", base_path, db_folder_name);
+    wodo_current_working_directory_db = join_paths("%s/%s", wodo_current_working_directory, db_filename);
 
-    FILE *file = fopen(database_filepath, "wb");
+    if (mkdir(wodo_current_working_directory, 0777) != 0) {
+        fprintf(stderr, "error: could not init repository %s: %s\n", wodo_current_working_directory, strerror(errno));
+        exit(1);
+    }
+
+    database_save();
+
+    return wodo_current_working_directory;
+}
+
+void database_save() {
+    FILE *file = fopen(wodo_current_working_directory_db, "wb");
 
     if (file == NULL) {
         fprintf(stderr, "could not open database file: %s\n", strerror(errno));
@@ -313,6 +350,13 @@ void database_save() {
 }
 
 void database_free() {
+    if (wodo_current_working_directory != NULL) {
+        free(wodo_current_working_directory);
+    }
+    if (wodo_current_working_directory_db != NULL) {
+        free(wodo_current_working_directory_db);
+    }
+
     for (size_t i = 0; i < cl_arr_len(global_database.files); i++) {
         Database_Db_File *it = global_database.files[i];
 
@@ -355,12 +399,13 @@ database_status_code_t database_add_file(Database_Db_File *file) {
 }
 
 char *get_unix_filepath(const char *name, size_t name_size) {
-    const char *user_home_folder = get_user_home_folder();
     unsigned char *hash = hash_bytes(name, name_size);
     unsigned long timestamp = get_current_timestamp();
-    char *filepath = malloc(256);
+    char timestamp_string[32];
 
-    snprintf(filepath, 256, "%s/%s/%s-%lu%s", user_home_folder, db_folder_name, hash, timestamp, file_extension);
+    snprintf(timestamp_string, sizeof(timestamp_string), "%lu", timestamp);
+
+    char *filepath = join_paths("%s/%s-%s%s", wodo_current_working_directory, hash, timestamp_string, file_extension);
 
     free(hash);
 

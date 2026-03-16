@@ -14,10 +14,16 @@ Database global_database = {0};
 int main(int argc, char **argv) {
     int return_code = 0;
 
-    database_status_code_t status_code = database_load();
+    database_status_code_t status_code;
 
-    if (status_code != DATABASE_OK_STATUS_CODE) {
-        fprintf(stderr, "error: could not open database due to: %s\n", database_status_code_string(status_code));
+    if ((status_code = load_wodo_database_working_directory()) != DATABASE_OK_STATUS_CODE) {
+        fprintf(stderr, "error: %s\n", database_status_code_string(status_code));
+
+        return status_code;
+    }
+
+    if ((status_code = database_load()) != DATABASE_OK_STATUS_CODE) {
+        fprintf(stderr, "error: %s\n", database_status_code_string(status_code));
         return status_code;
     }
 
@@ -35,6 +41,7 @@ int main(int argc, char **argv) {
         case AK_FORMAT: return_code = format_action(args->arg1); break;
         case AK_RENAME: return_code = rename_action(args->arg1, args->arg2); break;
         case AK_GET_REMINDERS: return_code = get_reminders_action(); break;
+        case AK_INIT: return_code = init_repository_action(); break;
         default: {
             usage(stderr, args->program_name, "invalid command line options");
 

@@ -12,6 +12,7 @@ typedef enum {
     AK_FORMAT,          // arg1(path)
     AK_RENAME,          // arg1(path) arg2(title)
     AK_GET_REMINDERS,   //
+    AK_INIT,            //
 } ArgumentKind;
 
 typedef struct {
