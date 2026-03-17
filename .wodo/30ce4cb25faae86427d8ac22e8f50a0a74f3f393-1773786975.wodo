@@ -1,0 +1,9 @@
+% Fix formatting
+
+.state todo
+.date 2026-03-17 19:37:38-03:00
+.tags
+
+Fix the spaces in the properties.
+
+Do not align the properties, just separe all of them by just one space.
