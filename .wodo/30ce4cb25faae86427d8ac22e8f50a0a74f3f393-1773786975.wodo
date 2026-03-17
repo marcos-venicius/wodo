@@ -1,7 +1,16 @@
+% Make path relative to the database path
+
+.state   doing
+.date    2026-03-17 19:40:00-03:00
+.tags    urgent
+
+Today, we store absolute paths, but it will break in another systems or if
+I change the folder I'm using the project.
+
 % Fix formatting
 
-.state todo
-.date 2026-03-17 19:37:38-03:00
+.state   todo
+.date    2026-03-17 19:37:38-03:00
 .tags
 
 Fix the spaces in the properties.
