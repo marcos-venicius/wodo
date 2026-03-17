@@ -143,10 +143,6 @@ error:
 void usage(FILE *stream, const char *program_name, char *error_message, ...) {
     va_list args;
 
-#ifdef DEV_MODE
-    printf("DEVMODE\n");
-#endif
-
     fprintf(stream, "Usage: %s [action] [arguments] [flags]\n\n", program_name);
 
     // --- SYSTEM MANAGEMENT ---

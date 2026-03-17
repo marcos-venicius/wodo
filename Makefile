@@ -12,8 +12,6 @@ OBJS=$(SRCS:.c=.o)
 ifeq ($(BUILD), 1)
 	BUILD_FLAGS = -O3 -march=native -flto -fPIE -pie -fno-semantic-interposition -fvisibility=hidden
 	DEBUG_FLAGS = 
-else
-	CXX_FLAGS += -DDEV_MODE="1"
 endif
 
 .PHONY: directories
@@ -21,7 +19,7 @@ endif
 all: directories $(OUTPUT_FOLDER)/wodo
 
 $(OUTPUT_FOLDER)/wodo: $(OBJS)
-	$(CXX) $(CXX_FLAGS) $(OPENSSL_FLAGS) $(BUILD_FLAGS) -lm -o $(OUTPUT_FOLDER)/wodo $^
+	$(CXX) $(CXX_FLAGS) $(OPENSSL_FLAGS) $(BUILD_FLAGS) $(DEBUG_FLAGS) -lm -o $(OUTPUT_FOLDER)/wodo $^
 
 directories: $(OUTPUT_FOLDER)
 

@@ -15,12 +15,7 @@
 #include "crossplatformops.h"
 
 
-#ifdef DEV_MODE
-static const char *db_folder_name = ".wodo.dev";
-#else
 static const char *db_folder_name = ".wodo";
-#endif
-
 static const char *file_extension = ".wodo";
 static const char *db_filename = ".wodo.db";
 static const char *db_file_magic_bytes = ".WODO";
