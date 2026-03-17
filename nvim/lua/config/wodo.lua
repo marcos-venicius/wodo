@@ -9,28 +9,26 @@ local function create_task_boilerplate()
   date = date:gsub("([+-]%d%d)(%d%d)$", "%1:%2")
 
   local boilerplate = {
-    "",
     "% Title",
     "",
     ".state todo",
-    ".date  " .. date,
+    ".date " .. date,
     ".tags",
     "",
     "Description",
-    "",
+    ""
   }
 
   local buf = vim.api.nvim_get_current_buf()
-  local last = vim.api.nvim_buf_line_count(buf)
 
-  vim.api.nvim_buf_set_lines(buf, last, last, false, boilerplate)
+  vim.api.nvim_buf_set_lines(buf, 0, 0, false, boilerplate)
 
   -- move cursor to "% Title"
-  local title_line = last + 2
+  local title_line = 2
   vim.api.nvim_win_set_cursor(0, { title_line, 2 })
 
-  -- start visual selection of "Title"
-  vim.cmd("normal! viw")
+  -- move cursor to the beginning of the title
+  vim.cmd("normal! b")
 end
 
 local function set_task_state(state)
@@ -374,6 +372,8 @@ local function create_tasks_file()
       vim.schedule(function()
         -- open the created file
         vim.cmd("edit " .. path)
+
+        set_winbar_title(input)
 
         -- run your boilerplate function
         create_task_boilerplate()
