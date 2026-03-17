@@ -4,7 +4,7 @@
 #include "argparser.h"
 #include "database.h"
 
-int add_action(const char *name);
+int add_action(char *name);
 int remove_action(const char *filepath);
 int parse_as_json_action(const char *filepath, Flags flags);
 int list_action(Flags flags);

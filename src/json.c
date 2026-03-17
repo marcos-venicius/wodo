@@ -181,15 +181,15 @@ void print_database_files_to_stdout_as_json(bool (*predicate)(wodo_task_t task, 
 
     printf("[");
     for (size_t i = 0; i < cl_arr_len(global_database.files); i++) {
-        Database_Db_File *it = global_database.files[i];
+        Database_File *it = global_database.files[i];
 
         char *content;
 
-        size_t length = read_from_file(it->filepath, &content);
+        size_t length = read_from_file(it->view_absolute_filepath, &content);
 
         reset_parser_state();
 
-        wodo_task_t *tasks = parse_tasks(it->filepath, content, length);
+        wodo_task_t *tasks = parse_tasks(it->view_absolute_filepath, content, length);
 
         bool matched_any_tasks = cl_arr_len(tasks) == 0;
 
@@ -236,7 +236,7 @@ void print_database_files_to_stdout_as_json(bool (*predicate)(wodo_task_t task, 
             .value = it->name
         }, stdout);
         printf(",");
-        printf("\"path\":\"%s\"", it->filepath);
+        printf("\"path\":\"%s\"", it->view_absolute_filepath);
         printf(",");
         {
             printf("\"states\": {");

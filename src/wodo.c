@@ -36,6 +36,7 @@ int main(int argc, char **argv) {
         return status_code;
     }
 
+
     switch (args->kind) {
         case AK_ADD: return_code = add_action(args->arg1); break;
         case AK_REMOVE: return_code = remove_action(args->arg1); break;

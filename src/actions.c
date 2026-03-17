@@ -14,96 +14,51 @@
 #include "arr.h"
 #include "crossplatformops.h"
 
-int add_action(const char *name) {
-    char *filepath = get_unix_filepath(name, strlen(name));
+int add_action(char *name) {
+    char *absolute_filepath;
 
-    FILE* fd = fopen(filepath, "w");
-
-    if (fd == NULL) {
-        fprintf(stderr, "\033[1;31merror:\033[0m could not add file due to: %s\n", strerror(errno));
-
-        return 1;
-    }
-
-    fclose(fd);
-
-    char *abs_path = realpath(filepath, NULL);
-
-    if (abs_path == NULL) {
-        fprintf(stderr, "\033[1;31merror:\033[0m invalid filepath\n");
-
-        return 1;
-    }
-
-    size_t abs_path_size = strlen(abs_path);
-    size_t name_size = strlen(name);
-
-    Database_Db_File *file = malloc(sizeof(Database_Db_File));
-    file->deleted = false;
-    file->filepath = malloc(abs_path_size + 1);
-    file->name = malloc(name_size + 1);
-
-    memcpy(file->filepath, abs_path, strlen(abs_path));
-    memcpy(file->name, name, strlen(name));
-
-    file->filepath[abs_path_size] = '\0';
-    file->name[name_size] = '\0';
-
-    database_status_code_t status_code = database_add_file(file);
+    database_status_code_t status_code = database_add_file(name, &absolute_filepath);
     
     if (status_code != DATABASE_OK_STATUS_CODE) {
-        fprintf(stderr, "\033[1;31merror:\033[0m could not add file due to: %s\n", database_status_code_string(status_code));
-
-        return status_code;
+        if (status_code == DATABASE_ERRNO) {
+            fprintf(stderr, "error: could not add file due to: %s\n", strerror(errno));
+        } else {
+            fprintf(stderr, "error: could not add file due to: %s\n", database_status_code_string(status_code));
+        }
+    } else {
+        printf("%s\n", absolute_filepath);
     }
 
-    char *content = NULL;
-
-    size_t content_size = read_from_file(abs_path, &content);
-
-    reset_parser_state();
-
-    wodo_task_t *tasks = parse_tasks(filepath, content, content_size);
-
-    printf("%s\n", filepath);
-
-    free(content);
-    cl_arr_free(tasks);
-    database_save();
-    free(filepath);
-
-    return 0;
+    return status_code;
 }
 
 int remove_action(const char *filepath) {
-    database_status_code_t status_code;
+    char *abs_path = realpath(filepath, NULL);
 
-    Database_Db_File *file = NULL;
+    if (abs_path == NULL) {
+        fprintf(stderr, "error: invalid filepath %s\n", filepath);
 
-    status_code = database_get_file_by_filepath(&file, filepath);
-
-    if (status_code == DATABASE_NOT_FOUND_STATUS_CODE) {
-        return 0;
+        return 1;
     }
 
-    if (status_code != DATABASE_OK_STATUS_CODE) {
-        return status_code;
+    database_status_code_t result;
+
+    if ((result = database_delete_file(abs_path)) != DATABASE_OK_STATUS_CODE) {
+        if (result == DATABASE_ERRNO) {
+            fprintf(stderr, "error: could not remove file due to: %s\n", strerror(errno));
+        } else {
+            fprintf(stderr, "error: could not remove file due to: %s\n", database_status_code_string(result));
+        }
     }
 
-    if (file == NULL) return 0;
-
-    database_delete_file(file);
-
-    database_save();
-
-    return 0;
+    return result;
 }
 
 int parse_as_json_action(const char *filepath, Flags flags) {
     char *abs_path = realpath(filepath, NULL);
 
     if (abs_path == NULL) {
-        fprintf(stderr, "\033[1;31merror:\033[0m invalid filepath\n");
+        fprintf(stderr, "error: invalid filepath %s\n", filepath);
 
         return 1;
     }
@@ -274,24 +229,22 @@ int rename_action(const char *filepath, char *title) {
     char *abs_path = realpath(filepath, NULL);
 
     if (abs_path == NULL) {
-        fprintf(stderr, "\033[1;31merror:\033[0m invalid filepath\n");
+        fprintf(stderr, "error: invalid filepath\n");
 
         return 1;
     }
 
-    for (size_t i = 0; i < cl_arr_len(global_database.files); i++) {
-        Database_Db_File *file = global_database.files[i];
+    database_status_code_t result;
 
-        if (strncmp(file->filepath, filepath, strlen(file->filepath)) == 0) {
-            database_rename_file(file, title);
-
-            database_save();
-
-            return 0;
+    if ((result = database_rename_file(abs_path, title)) != DATABASE_OK_STATUS_CODE) {
+        if (result == DATABASE_ERRNO) {
+            fprintf(stderr, "error: could not rename file due to: %s\n", strerror(errno));
+        } else {
+            fprintf(stderr, "error: could not rename file due to: %s\n", database_status_code_string(result));
         }
     }
 
-    return DATABASE_NOT_FOUND_STATUS_CODE;
+    return result;
 }
 
 static bool get_reminders_action_task_predicate(wodo_task_t task, Flags flags) {
