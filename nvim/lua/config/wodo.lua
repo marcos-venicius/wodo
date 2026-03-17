@@ -441,7 +441,9 @@ local function telescope_list_tasks(flags)
     end
 
     if #data == 0 then
-      vim.notify("There is not task to list", vim.log.levels.INFO)
+      vim.schedule(function()
+        vim.notify("There is not task to list", vim.log.levels.INFO)
+      end)
       return
     end
 

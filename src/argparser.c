@@ -34,21 +34,13 @@ Arguments *parse_arguments(int argc, char **argv) {
             char *arg1 = getarg();
 
             if (arg1 == NULL) {
-                usage(stderr, args->program_name, "action \"%s\" at least a title", arg);
+                usage(stderr, args->program_name, "action \"%s\" expects a title", arg);
 
                 goto error;
             }
 
-            char *arg2 = getarg();
-
-            if (arg2 == NULL) {
-                args->kind = AK_ADD;
-                args->arg1 = arg1;
-            } else {
-                args->kind = AK_ADD_PATH;
-                args->arg1 = arg1;
-                args->arg2 = arg2;
-            }
+            args->kind = AK_ADD;
+            args->arg1 = arg1;
         } else if (arg_cmp(arg, "remove", "r")) {
             char *value = getarg();
 
@@ -163,7 +155,7 @@ void usage(FILE *stream, const char *program_name, char *error_message, ...) {
 
     // --- FILE MANAGEMENT GROUP ---
     fprintf(stream, "File Management:\n");
-    fprintf(stream, "  add, a     <title> [path]     Add a new file (defaults to root if path is omitted)\n");
+    fprintf(stream, "  add, a     <title>            Add a new .wodo file\n");
     fprintf(stream, "  remove, r  <path>             Remove a file from the system\n");
     fprintf(stream, "  rename, n  <path> <title>     Rename an existing .wodo file\n");
     fprintf(stream, "  format, f  <path>             Format and clean a .wodo file\n\n");

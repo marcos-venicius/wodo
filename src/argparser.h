@@ -5,7 +5,6 @@
 
 typedef enum {
     AK_ADD = 1,         // arg1(title)
-    AK_ADD_PATH,        // arg1(title) arg2(path)
     AK_REMOVE,          // arg1(path)
     AK_PARSE_AS_JSON,   // arg1(path) tag_filter(-ft) state_filter(-fs)
     AK_LIST,            // tag_filter(-ft) state_filter(-fs)

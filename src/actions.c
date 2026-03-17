@@ -14,7 +14,19 @@
 #include "arr.h"
 #include "crossplatformops.h"
 
-int add_path_action(const char *name, const char *filepath) {
+int add_action(const char *name) {
+    char *filepath = get_unix_filepath(name, strlen(name));
+
+    FILE* fd = fopen(filepath, "w");
+
+    if (fd == NULL) {
+        fprintf(stderr, "\033[1;31merror:\033[0m could not add file due to: %s\n", strerror(errno));
+
+        return 1;
+    }
+
+    fclose(fd);
+
     char *abs_path = realpath(filepath, NULL);
 
     if (abs_path == NULL) {
@@ -53,34 +65,14 @@ int add_path_action(const char *name, const char *filepath) {
 
     wodo_task_t *tasks = parse_tasks(filepath, content, content_size);
 
+    printf("%s\n", filepath);
+
     free(content);
     cl_arr_free(tasks);
-
     database_save();
+    free(filepath);
 
     return 0;
-}
-
-int add_action(const char *name) {
-    char *path = get_unix_filepath(name, strlen(name));
-
-    FILE* file = fopen(path, "w");
-
-    if (file == NULL) {
-        fprintf(stderr, "\033[1;31merror:\033[0m could not add file due to: %s\n", strerror(errno));
-
-        return 1;
-    }
-
-    fclose(file);
-
-    int return_code = add_path_action(name, path);
-
-    printf("%s\n", path);
-
-    free(path);
-
-    return return_code;
 }
 
 int remove_action(const char *filepath) {
