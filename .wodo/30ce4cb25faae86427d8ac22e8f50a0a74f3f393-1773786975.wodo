@@ -1,6 +1,14 @@
+% Fix creating new files
+
+.state   done
+.date    2026-03-17 21:18:36-03:00
+.tags
+
+When we create a file from a current buffer, the content is being copied into the new file.
+
 % Remove file from disk when using remove action
 
-.state   doing
+.state   done
 .date    2026-03-17 21:01:28-03:00
 .tags    urgent
 
