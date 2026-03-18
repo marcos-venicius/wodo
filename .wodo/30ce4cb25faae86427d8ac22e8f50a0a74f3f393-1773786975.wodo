@@ -1,6 +1,14 @@
+% Remove file from disk when using remove action
+
+.state   doing
+.date    2026-03-17 21:01:28-03:00
+.tags    urgent
+
+Today it only removes from the database tracking system. We also need to remove it from the file system.
+
 % Make path relative to the database path
 
-.state done
+.state   done
 .date    2026-03-17 19:40:00-03:00
 .tags    urgent
 
