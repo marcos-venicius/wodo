@@ -186,7 +186,7 @@ int format_action(const char *filepath) {
         print_trimed_string(task.title.string);
         printf("\n");
         printf("\n");
-        printf(".state   ");
+        printf(".state ");
         switch (task.state_property.state) {
             case Wodo_Task_State_Todo: printf("todo\n"); break;
             case Wodo_Task_State_Doing: printf("doing\n"); break;
@@ -194,13 +194,13 @@ int format_action(const char *filepath) {
             case Wodo_Task_State_Done: printf("done\n"); break;
             default: assert(0 && "unhandled state during formatting");
         }
-        printf(".date    ");
+        printf(".date ");
         print_wodo_datetime(task.date_property.datetime, false);
         printf("\n");
         printf(".tags");
 
         if (cl_arr_len(task.tags_property.node_array) > 0) {
-            printf("    ");
+            printf(" ");
             for (size_t j = 0; j < (cl_arr_len(task.tags_property.node_array)); j++) {
                 if (j > 0) printf(" ");
 

@@ -1,7 +1,7 @@
 % Add "sync" flag so you can just read and write the database
 
-.state   todo
-.date    2026-03-17 20:58:52-03:00
+.state todo
+.date 2026-03-17 20:58:52-03:00
 .tags
 
 It's usefull when you have an old db version and you want to save to the latest version of the database but
@@ -12,8 +12,8 @@ It'll just load the db and write it to the last version.
 
 % Make parse command accept the tasks file format via stdin
 
-.state   todo
-.date    2026-03-17 19:36:31-03:00
+.state todo
+.date 2026-03-17 19:36:31-03:00
 .tags
 .remind
 
