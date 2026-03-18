@@ -136,11 +136,6 @@ database_status_code_t load_wodo_database_working_directory() {
 }
 
 static void free_db_file(Database_File *file) {
-    if (file->name != NULL) {
-        free(file->name); 
-        file->name = NULL;
-    }
-
     if (file->view_absolute_filepath != NULL) {
         free(file->view_absolute_filepath);
         file->view_absolute_filepath = NULL;
@@ -534,7 +529,13 @@ database_status_code_t database_delete_file(const char *absolute_filepath) {
 
     file->view_deleted = true;
 
+    if (remove(absolute_filepath) != 0) {
+        fprintf(stderr, "error: could not remove file from the system: %s\n", strerror(errno));
+        exit(1);
+    }
+
     database_save();
+
 
     return DATABASE_OK_STATUS_CODE;
 }

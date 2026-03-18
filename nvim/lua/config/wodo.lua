@@ -371,10 +371,12 @@ local function create_tasks_file()
 
       vim.schedule(function()
         -- open the created file
-        vim.cmd("edit " .. path)
+        vim.cmd.tabnew({ args = { path } })
 
         set_winbar_title(input)
+      end)
 
+      vim.schedule(function ()
         -- run your boilerplate function
         create_task_boilerplate()
       end)
