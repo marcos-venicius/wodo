@@ -1,0 +1,34 @@
+% Fix creating new files
+
+.state done
+.date 2026-03-17 21:18:36-03:00
+.tags
+
+When we create a file from a current buffer, the content is being copied into the new file.
+
+% Remove file from disk when using remove action
+
+.state done
+.date 2026-03-17 21:01:28-03:00
+.tags urgent
+
+Today it only removes from the database tracking system. We also need to remove it from the file system.
+
+% Make path relative to the database path
+
+.state done
+.date 2026-03-17 19:40:00-03:00
+.tags urgent
+
+Today, we store absolute paths, but it will break in another systems or if
+I change the folder I'm using the project.
+
+% Fix formatting
+
+.state done
+.date 2026-03-17 19:37:38-03:00
+.tags
+
+Fix the spaces in the properties.
+
+Do not align the properties, just separe all of them by just one space.
