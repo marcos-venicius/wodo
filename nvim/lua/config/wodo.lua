@@ -650,7 +650,7 @@ vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
   callback = function(ev)
     vim.opt_local.filetype = 'wodo'
     vim.opt_local.conceallevel = 2
-    vim.opt_local.concealcursor = 'nc'
+    vim.opt_local.concealcursor = 'c'
 
     local opts = { buffer = ev.buf, remap = false }
 
