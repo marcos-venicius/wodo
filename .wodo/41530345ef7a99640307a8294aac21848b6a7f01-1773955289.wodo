@@ -1,0 +1,34 @@
+% Next steps of wodo
+
+.state doing
+.date 2026-03-19 18:08:39-03:00
+.tags discussion
+.remind
+
+# Brainstorming
+
+Should it have a GUI?
+
+I don't need a GUI explicitly. I just want to be able to render stuff.
+If I can achieve this goal by somehow using vim or neovim as a base, it would be very nice.
+
+My idea to this project is to be vim-based. And by "vim-based" I mean I want to port it only to vim.
+I don't care about other editors like VSCode, Sublime, whatever.
+
+The purpose of this tool is to work on neovim primarly, the future I don't know.
+
+So, I want this tool to have it's own file format (.wodo), it's own syntax, colors,
+rendering, patterns, tokens, etc.
+
+But, at the same time I want it to be used just like git and along with it.
+You just commit the ".wodo" folder and there you have your tasks manager right there.
+
+I also think about having some kind of compression. Transforming all ".wodo" files in binary,
+so I can reduce the size.
+
+But at the same time I'm thinking about git conflicts.
+
+- So, **should I provide a way to have separated "workspaces"**?
+- **Should we have some kind of tree navigator for the workspaces and the tasks?** This would be very nice. That's a very good idea.
+- Should we, for every tasks file, have it's own directory? So we can store assets and whatelse we need. And maybe create a syntax to reference them?
+- By the way, should it even render images? What about just referencing them? and then having some kind of map that opens it in an external tool?

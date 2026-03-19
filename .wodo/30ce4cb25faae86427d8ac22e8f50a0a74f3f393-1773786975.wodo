@@ -1,3 +1,9 @@
+% The gt and gT maps are conflicting with default neovim ones
+
+.state todo
+.date 2026-03-19 18:22:11-03:00
+.tags
+
 % Add file lock when editing a file so we don't have concurrence problems
 
 .state todo
