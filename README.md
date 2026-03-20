@@ -1,5 +1,7 @@
 # WODO
 
+![](./assets/wodo.png)
+
 _Wodo_ is a vim-based task management system.
 
 <img width="1289" height="842" alt="image" src="https://github.com/user-attachments/assets/a1ec1ffc-6963-4435-a1fa-f447c83f7e6e" />
