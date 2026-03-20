@@ -153,29 +153,14 @@ static void print_trimed_line_string(wodo_string_t string) {
     printf("%.*s", (int)(last_line - first_line + 1), string.value + first_line);
 }
 
-int format_action(const char *filepath) {
-    char *abs_path = realpath(filepath, NULL);
-
-    if (abs_path == NULL) {
-        fprintf(stderr, "\033[1;31merror:\033[0m invalid filepath\n");
-
-        return 1;
-    }
-
-    database_status_code_t status_code = DATABASE_OK_STATUS_CODE;
-
-    if ((status_code = database_get_file_by_filepath(NULL, abs_path)) != DATABASE_OK_STATUS_CODE) {
-        fprintf(stderr, "error: could not format file because we couldn't get it from database: %s\n", database_status_code_string(status_code));
-        return status_code;
-    }
-
+int format_action() {
     char *content;
 
-    size_t length = read_from_file(filepath, &content);
+    size_t length = read_from_stdin(&content);
 
     reset_parser_state();
 
-    wodo_task_t *tasks = parse_tasks(filepath, content, length);
+    wodo_task_t *tasks = parse_tasks("stdin", content, length);
 
     for (size_t i = 0; i < cl_arr_len(tasks); i++) {
         if (i > 0) printf("\n");

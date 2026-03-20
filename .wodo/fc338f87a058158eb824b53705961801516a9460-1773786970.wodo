@@ -1,3 +1,15 @@
+% Make parse and format command accept the tasks file format via stdin
+
+.state doing
+.date 2026-03-17 19:36:31-03:00
+.tags
+.remind
+
+It will be better because I can send the current neovim buffer to the stdin.
+
+If I need to read the file and the user didn't saved the current task,
+the format will lose the newer information the user created.
+
 % Add "sync" flag so you can just read and write the database
 
 .state todo
@@ -9,15 +21,3 @@ you don't want to do any write operations.
 
 
 It'll just load the db and write it to the last version.
-
-% Make parse command accept the tasks file format via stdin
-
-.state todo
-.date 2026-03-17 19:36:31-03:00
-.tags
-.remind
-
-It will be better because I can send the current neovim buffer to the stdin.
-
-If I need to read the file and the user didn't saved the current task,
-the format will lose the newer information the user created.

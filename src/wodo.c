@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
         case AK_REMOVE: return_code = remove_action(args->arg1); break;
         case AK_PARSE_AS_JSON: return_code = parse_as_json_action(args->arg1, args->flags); break;
         case AK_LIST: return_code = list_action(args->flags); break;
-        case AK_FORMAT: return_code = format_action(args->arg1); break;
+        case AK_FORMAT: return_code = format_action(); break;
         case AK_RENAME: return_code = rename_action(args->arg1, args->arg2); break;
         case AK_GET_REMINDERS: return_code = get_reminders_action(); break;
         default: {

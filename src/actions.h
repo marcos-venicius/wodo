@@ -8,7 +8,7 @@ int add_action(char *name);
 int remove_action(const char *filepath);
 int parse_as_json_action(const char *filepath, Flags flags);
 int list_action(Flags flags);
-int format_action(const char *filepath);
+int format_action();
 int rename_action(const char *filepath, char *title);
 int get_reminders_action();
 int init_repository_action();

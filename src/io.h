@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 size_t read_from_file(const char *filename, char **content);
+size_t read_from_stdin(char **content);
 
 #endif // !_WODO_IO_H_
 

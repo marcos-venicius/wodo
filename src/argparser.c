@@ -87,16 +87,7 @@ Arguments *parse_arguments(int argc, char **argv) {
         } else if (arg_cmp(arg, "list", "l")) {
             args->kind = AK_LIST;
         } else if (arg_cmp(arg, "format", "f")) {
-            char *value = getarg();
-
-            if (value == NULL) {
-                usage(stderr, args->program_name, "action \"%s\" expects a value.", arg);
-
-                goto error;
-            }
-
             args->kind = AK_FORMAT;
-            args->arg1 = value;
         } else if (arg_cmp_single(arg, "reminders")) {
             args->kind = AK_GET_REMINDERS;
         } else if (arg_cmp_single(arg, "init")) {
@@ -154,7 +145,7 @@ void usage(FILE *stream, const char *program_name, char *error_message, ...) {
     fprintf(stream, "  add, a     <title>            Add a new .wodo file\n");
     fprintf(stream, "  remove, r  <path>             Remove a file from the system\n");
     fprintf(stream, "  rename, n  <path> <title>     Rename an existing .wodo file\n");
-    fprintf(stream, "  format, f  <path>             Format and clean a .wodo file\n\n");
+    fprintf(stream, "  format, f                     Format and clean a .wodo file from stdin\n\n");
 
     // --- DATA & INSPECTION GROUP ---
     fprintf(stream, "Data & Inspection:\n");

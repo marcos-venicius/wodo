@@ -43,3 +43,24 @@ size_t read_from_file(const char *filename, char **content) {
     return stream_size;
 }
 
+size_t read_from_stdin(char **content) {
+    char *line = NULL;
+    size_t len;
+    size_t read_size = 0;
+    size_t content_length = 0;
+    char *buffer = NULL;
+
+    while ((read_size = getline(&line, &len, stdin)) != -1) {
+        size_t previous_length = content_length;
+        content_length += read_size;
+
+        // TODO: handle errors correctly
+        buffer = realloc(buffer, content_length);
+
+        memcpy(buffer + previous_length, line, read_size);
+    }
+
+    if (content != NULL) *content = buffer;
+
+    return content_length;
+}
