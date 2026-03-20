@@ -579,20 +579,19 @@ local function delete_current_tasks_file()
 end
 
 local function format_tasks_file()
-  local filepath = vim.fn.expand("%:p")
-  if filepath == "" then return end
+  local lines = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
+  local cmd = {"wodo", "f"}
+  local proc = vim.system(cmd, { stdin = lines }):wait()
+  local result = proc.stdout;
 
-  local cmd = "wodo f " .. vim.fn.shellescape(filepath)
-  local formatted = vim.fn.system(cmd)
+  if proc.code == 0 then
+    local new_lines = vim.split(result, "\n")
 
-  if vim.v.shell_error == 0 then
-    local lines = vim.split(formatted, "\n")
-
-    if lines[#lines] == "" then table.remove(lines) end
-
-    vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
+    vim.api.nvim_buf_set_lines(0, 0, -1, false, new_lines)
   else
-    vim.notify("Wodo error: " .. formatted, vim.log.levels.ERROR)
+    vim.schedule(function ()
+      vim.notify("Wodo error: " .. result, vim.log.levels.ERROR)
+    end)
   end
 end
 

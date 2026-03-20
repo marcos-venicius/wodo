@@ -5,6 +5,9 @@
 .tags
 .remind
 
+- [Todo] Parse command
+- [Done] Format command
+
 It will be better because I can send the current neovim buffer to the stdin.
 
 If I need to read the file and the user didn't saved the current task,
@@ -21,3 +24,4 @@ you don't want to do any write operations.
 
 
 It'll just load the db and write it to the last version.
+
