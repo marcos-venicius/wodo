@@ -38,12 +38,12 @@ int main(int argc, char **argv) {
 
 
     switch (args->kind) {
-        case AK_ADD: return_code = add_action(args->arg1); break;
-        case AK_REMOVE: return_code = remove_action(args->arg1); break;
-        case AK_PARSE_AS_JSON: return_code = parse_as_json_action(args->arg1, args->flags); break;
+        case AK_ADD: return_code = add_wodo_file_action(args->arg1); break;
+        case AK_REMOVE: return_code = remove_wodo_file_action(args->arg1); break;
+        case AK_PARSE: return_code = parse_wodo_file_from_stdin_action(args->arg1, args->flags); break;
         case AK_LIST: return_code = list_action(args->flags); break;
-        case AK_FORMAT: return_code = format_action(); break;
-        case AK_RENAME: return_code = rename_action(args->arg1, args->arg2); break;
+        case AK_FORMAT: return_code = format_wodo_file_from_stdin_action(args->arg1); break;
+        case AK_RENAME: return_code = rename_wodo_file_action(args->arg1, args->arg2); break;
         case AK_GET_REMINDERS: return_code = get_reminders_action(); break;
         default: {
             usage(stderr, args->program_name, "invalid command line options");

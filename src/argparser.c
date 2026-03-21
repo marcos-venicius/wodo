@@ -73,7 +73,7 @@ Arguments *parse_arguments(int argc, char **argv) {
             args->arg1 = path;
             args->arg2 = title;
         } else if (arg_cmp(arg, "parse", "p")) {
-            args->kind = AK_PARSE_AS_JSON;
+            args->kind = AK_PARSE;
 
             char *value = getarg();
 
@@ -88,6 +88,16 @@ Arguments *parse_arguments(int argc, char **argv) {
             args->kind = AK_LIST;
         } else if (arg_cmp(arg, "format", "f")) {
             args->kind = AK_FORMAT;
+
+            char *value = getarg();
+
+            if (value == NULL) {
+                usage(stderr, args->program_name, "action \"%s\" expects a value.", arg);
+
+                goto error;
+            }
+
+            args->arg1 = value;
         } else if (arg_cmp_single(arg, "reminders")) {
             args->kind = AK_GET_REMINDERS;
         } else if (arg_cmp_single(arg, "init")) {
@@ -145,13 +155,15 @@ void usage(FILE *stream, const char *program_name, char *error_message, ...) {
     fprintf(stream, "  add, a     <title>            Add a new .wodo file\n");
     fprintf(stream, "  remove, r  <path>             Remove a file from the system\n");
     fprintf(stream, "  rename, n  <path> <title>     Rename an existing .wodo file\n");
-    fprintf(stream, "  format, f                     Format and clean a .wodo file from stdin\n\n");
+    fprintf(stream, "  format, f  <path>             Format and clean a .wodo file from stdin;\n");
+    fprintf(stream, "                                <path> here is used only for error reporting.\n\n");
 
     // --- DATA & INSPECTION GROUP ---
     fprintf(stream, "Data & Inspection:\n");
     fprintf(stream, "  reminders                     List all (not done) tasks marked with 'remind' property\n");
     fprintf(stream, "  list, l    [flags]            List all database files\n");
-    fprintf(stream, "  parse, p   <path> [flags]     Parse a .wodo file as JSON\n\n");
+    fprintf(stream, "  parse, p   <path> [flags]     Parse a .wodo file;\n");
+    fprintf(stream, "                                <path> here is used only for error reporting.\n\n");
 
     // --- FILTER FLAGS GROUP ---
     fprintf(stream, "Global Filter Flags (use with list/parse):\n");

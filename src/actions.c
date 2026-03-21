@@ -14,7 +14,7 @@
 #include "arr.h"
 #include "crossplatformops.h"
 
-int add_action(char *name) {
+int add_wodo_file_action(char *name) {
     char *absolute_filepath;
 
     database_status_code_t status_code = database_add_file(name, &absolute_filepath);
@@ -32,7 +32,7 @@ int add_action(char *name) {
     return status_code;
 }
 
-int remove_action(const char *filepath) {
+int remove_wodo_file_action(const char *filepath) {
     char *abs_path = realpath(filepath, NULL);
 
     if (abs_path == NULL) {
@@ -54,25 +54,10 @@ int remove_action(const char *filepath) {
     return result;
 }
 
-int parse_as_json_action(const char *filepath, Flags flags) {
-    char *abs_path = realpath(filepath, NULL);
-
-    if (abs_path == NULL) {
-        fprintf(stderr, "error: invalid filepath %s\n", filepath);
-
-        return 1;
-    }
-
-    database_status_code_t status_code = DATABASE_OK_STATUS_CODE;
-
-    if ((status_code = database_get_file_by_filepath(NULL, abs_path)) != DATABASE_OK_STATUS_CODE) {
-        fprintf(stderr, "error: could not format file because we couldn't get it from database: %s\n", database_status_code_string(status_code));
-        return status_code;
-    }
-
+int parse_wodo_file_from_stdin_action(const char *filepath, Flags flags) {
     char *content;
 
-    size_t length = read_from_file(filepath, &content);
+    size_t length = read_from_stdin(&content);
 
     reset_parser_state();
 
@@ -153,14 +138,14 @@ static void print_trimed_line_string(wodo_string_t string) {
     printf("%.*s", (int)(last_line - first_line + 1), string.value + first_line);
 }
 
-int format_action() {
+int format_wodo_file_from_stdin_action(const char *filepath) {
     char *content;
 
     size_t length = read_from_stdin(&content);
 
     reset_parser_state();
 
-    wodo_task_t *tasks = parse_tasks("stdin", content, length);
+    wodo_task_t *tasks = parse_tasks(filepath, content, length);
 
     for (size_t i = 0; i < cl_arr_len(tasks); i++) {
         if (i > 0) printf("\n");
@@ -210,7 +195,7 @@ int format_action() {
     return 0;
 }
 
-int rename_action(const char *filepath, char *title) {
+int rename_wodo_file_action(const char *filepath, char *title) {
     char *abs_path = realpath(filepath, NULL);
 
     if (abs_path == NULL) {

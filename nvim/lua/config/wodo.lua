@@ -243,7 +243,7 @@ local function prev_task()
   end
 end
 
-local function task_picker(flags)
+local function parse_wodo_file_action(flags)
   local pickers = require("telescope.pickers")
   local finders = require("telescope.finders")
   local conf = require("telescope.config").values
@@ -253,6 +253,7 @@ local function task_picker(flags)
   local previewers = require("telescope.previewers")
 
   local path = vim.api.nvim_buf_get_name(0)
+  local lines = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
 
   local cmd = { "wodo", "p", path }
 
@@ -262,98 +263,96 @@ local function task_picker(flags)
     end
   end
 
-  vim.system(cmd, { text = true }, function(result)
-    local ok, data = pcall(vim.json.decode, result.stdout)
-    if not ok then return end
+  local result = vim.system(cmd, { text = true, stdin = lines }):wait()
+  local ok, data = pcall(vim.json.decode, result.stdout)
+  if not ok then return end
 
-    local tasks = {}
+  local tasks = {}
 
-    for _, task in ipairs(data) do
-      table.insert(tasks, {
-        title = task.title.content,
-        state = task.state.content,
-        description = task.description.content,
-        line = task.title.location.line,
+  for _, task in ipairs(data) do
+    table.insert(tasks, {
+      title = task.title.content,
+      state = task.state.content,
+      description = task.description.content,
+      line = task.title.location.line,
+    })
+  end
+
+  vim.schedule(function()
+    local displayer = entry_display.create({
+      separator = " ",
+      items = {
+        { width = 10 },
+        { remaining = true },
+      },
+    })
+
+    local function make_display(entry)
+      local hl = "Normal"
+
+      if entry.state == "todo" then hl = "wodoStateTodo" end
+      if entry.state == "doing" then hl = "wodoStateDoing" end
+      if entry.state == "done" then hl = "wodoStateDone" end
+      if entry.state == "blocked" then hl = "wodoStateBlocked" end
+
+      return displayer({
+        { entry.state, hl },
+        entry.title,
       })
     end
 
-    vim.schedule(function()
+    pickers.new({}, {
+      prompt_title = "Tasks",
 
-      local displayer = entry_display.create({
-        separator = " ",
-        items = {
-          { width = 10 },
-          { remaining = true },
-        },
-      })
-
-      local function make_display(entry)
-        local hl = "Normal"
-
-        if entry.state == "todo" then hl = "wodoStateTodo" end
-        if entry.state == "doing" then hl = "wodoStateDoing" end
-        if entry.state == "done" then hl = "wodoStateDone" end
-        if entry.state == "blocked" then hl = "wodoStateBlocked" end
-
-        return displayer({
-          { entry.state, hl },
-          entry.title,
-        })
-      end
-
-      pickers.new({}, {
-        prompt_title = "Tasks",
-
-        finder = finders.new_table({
-          results = tasks,
-          entry_maker = function(entry)
-            return {
-              value = entry,
-              ordinal = entry.title,
-              display = make_display,
-              state = entry.state,
-              title = entry.title,
-              description = entry.description,
-              line = entry.line,
-            }
-          end,
-        }),
-
-        sorter = conf.generic_sorter({}),
-
-        previewer = previewers.new_buffer_previewer({
-          title = "Description",
-
-          define_preview = function(self, entry)
-            local desc = entry.value.description or ""
-            local lines = vim.split(desc, "\n")
-
-            local bufnr = self.state.bufnr
-
-            vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
-
-            -- render markdown
-            vim.bo[bufnr].filetype = "wodo"
-          end,
-        }),
-
-        attach_mappings = function(_, _)
-          actions.select_default:replace(function(prompt_bufnr)
-            local selection = action_state.get_selected_entry()
-            actions.close(prompt_bufnr)
-
-            vim.api.nvim_win_set_cursor(0, { selection.line, 0 })
-          end)
-
-          return true
+      finder = finders.new_table({
+        results = tasks,
+        entry_maker = function(entry)
+          return {
+            value = entry,
+            ordinal = entry.title,
+            display = make_display,
+            state = entry.state,
+            title = entry.title,
+            description = entry.description,
+            line = entry.line,
+          }
         end,
-      }):find()
+      }),
 
-    end)
+      sorter = conf.generic_sorter({}),
+
+      previewer = previewers.new_buffer_previewer({
+        title = "Description",
+
+        define_preview = function(self, entry)
+          local desc = entry.value.description or ""
+          local lines = vim.split(desc, "\n")
+
+          local bufnr = self.state.bufnr
+
+          vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+
+          -- render markdown
+          vim.bo[bufnr].filetype = "wodo"
+        end,
+      }),
+
+      attach_mappings = function(_, _)
+        actions.select_default:replace(function(prompt_bufnr)
+          local selection = action_state.get_selected_entry()
+          actions.close(prompt_bufnr)
+
+          vim.api.nvim_win_set_cursor(0, { selection.line, 0 })
+        end)
+
+        return true
+      end,
+    }):find()
+
   end)
 end
 
-local function create_tasks_file()
+local function add_wodo_file_action()
   vim.ui.input({ prompt = "Tasks title: " }, function(input)
     if not input or input == "" then
       return
@@ -384,7 +383,7 @@ local function create_tasks_file()
   end)
 end
 
-local function rename_tasks_file()
+local function rename_wodo_file_action()
   local path = vim.api.nvim_buf_get_name(0)
 
   if path == "" then return end
@@ -410,7 +409,7 @@ local function rename_tasks_file()
   end)
 end
 
-local function telescope_list_tasks(flags)
+local function list_action(flags)
   local pickers = require("telescope.pickers")
   local finders = require("telescope.finders")
   local conf = require("telescope.config").values
@@ -553,7 +552,7 @@ local function confirm_delete(on_confirm)
   }):find()
 end
 
-local function delete_current_tasks_file()
+local function remove_wodo_file_action()
   local path = vim.api.nvim_buf_get_name(0)
 
   if path == "" then
@@ -578,9 +577,10 @@ local function delete_current_tasks_file()
   end)
 end
 
-local function format_tasks_file()
+local function format_wodo_file_action()
+  local path = vim.api.nvim_buf_get_name(0)
   local lines = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
-  local cmd = {"wodo", "f"}
+  local cmd = {"wodo", "f", path}
   local proc = vim.system(cmd, { stdin = lines }):wait()
   local result = proc.stdout;
 
@@ -595,7 +595,7 @@ local function format_tasks_file()
   end
 end
 
-local function search_tasks()
+local function filter_tasks_locally_action()
   vim.ui.input({ prompt = "Filters: state:<state>, tag:<tag>" }, function(input)
     if not input or input == "" then
       return
@@ -614,12 +614,12 @@ local function search_tasks()
     end
 
     if #flags > 0 then
-      task_picker(flags)
+      parse_wodo_file_action(flags)
     end
   end)
 end
 
-local function search_file_tasks()
+local function filter_tasks_globally_action()
   vim.ui.input({ prompt = "Filters: state:<state>, tag:<tag>" }, function(input)
     if not input or input == "" then
       return
@@ -638,7 +638,7 @@ local function search_file_tasks()
     end
 
     if #flags > 0 then
-      telescope_list_tasks(flags)
+      list_action(flags)
     end
   end)
 end
@@ -658,16 +658,16 @@ vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
     vim.keymap.set("n", "<leader>wi", function() set_task_state("doing") end, opts)
     vim.keymap.set("n", "<leader>wb", function() set_task_state("blocked") end, opts)
     vim.keymap.set("n", "<leader>wd", function() set_task_state("done") end, opts)
-    vim.keymap.set("n", "<leader>wx", delete_current_tasks_file, opts)
+    vim.keymap.set("n", "<leader>wx", remove_wodo_file_action, opts)
     vim.keymap.set("n", "gt", goto_title, opts)
     vim.keymap.set("n", "gd", goto_description, opts)
     vim.keymap.set("n", "gT", goto_tags, opts)
     vim.keymap.set("n", "]w", next_task, opts)
     vim.keymap.set("n", "[w", prev_task, opts)
-    vim.keymap.set("n", "<leader>wl", function() task_picker(nil) end, opts)
-    vim.keymap.set("n", "<leader>wf", format_tasks_file, opts)
-    vim.keymap.set("n", "<leader>wr", rename_tasks_file, opts)
-    vim.keymap.set("n", "<leader>ws", search_tasks, opts)
+    vim.keymap.set("n", "<leader>wl", function() parse_wodo_file_action(nil) end, opts)
+    vim.keymap.set("n", "<leader>wf", format_wodo_file_action, opts)
+    vim.keymap.set("n", "<leader>wr", rename_wodo_file_action, opts)
+    vim.keymap.set("n", "<leader>ws", filter_tasks_locally_action, opts)
   end
 })
 
@@ -675,9 +675,9 @@ vim.api.nvim_create_autocmd("BufEnter", {
   group = group,
   pattern = "*",
   callback = function()
-    vim.keymap.set("n", "<leader>wa", create_tasks_file)
-    vim.keymap.set("n", "<leader>wL", function() telescope_list_tasks(nil) end)
-    vim.keymap.set("n", "<leader>wS", search_file_tasks)
+    vim.keymap.set("n", "<leader>wa", add_wodo_file_action)
+    vim.keymap.set("n", "<leader>wL", function() list_action(nil) end)
+    vim.keymap.set("n", "<leader>wS", filter_tasks_globally_action)
   end
 })
 
@@ -696,7 +696,7 @@ vim.api.nvim_create_autocmd("VimEnter", {
 
         local json_output = table.concat(data, "\n")
         local ok, parsed_data = pcall(vim.json.decode, json_output)
-        
+
         if not ok or type(parsed_data) ~= "table" then return end
 
         for _, file_data in ipairs(parsed_data) do
