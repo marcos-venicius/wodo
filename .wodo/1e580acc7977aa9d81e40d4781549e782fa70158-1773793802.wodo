@@ -1,14 +1,16 @@
 % Make wodo work like git, with a .wodo folder with zipped files so we can separate tasks per project/folder
 
-.state   done
-.date    2026-03-12 08:32:30-03:00
+.state done
+.date 2026-03-12 08:32:30-03:00
 .tags
+
+**The folder is not zipped yet**
 
 % Refatorar código da implementação do wodo no neovim
 
-.state   done
-.date    2026-03-07 20:32:30-03:00
-.tags    wodo
+.state done
+.date 2026-03-07 20:32:30-03:00
+.tags wodo
 
 # Correções
 - [Done] Revisitar os arquivos "visualizer.h" e "visualizer.c" e remover o que não é necessário.
@@ -20,9 +22,9 @@
 
 % Desenvolver formatador de arquivos
 
-.state   done
-.date    2026-03-07 20:34:51-03:00
-.tags    wodo
+.state done
+.date 2026-03-07 20:34:51-03:00
+.tags wodo
 
 Fazer a implementação de um formatador de arquivos .wodo para facilitar a formatação
 dos arquivos durante a edição.
@@ -31,9 +33,9 @@ Comunicar isso com o neovim e fazer o update via mappings.
 
 % Adicionar build de desenvolvimento
 
-.state   done
-.date    2026-03-10 07:54:17-03:00
-.tags    wodo
+.state done
+.date 2026-03-10 07:54:17-03:00
+.tags wodo
 
 Extremamente útil durante o desenvolvimento.
 
@@ -43,14 +45,14 @@ Então, modo de desenvolvimento deve salvar e consumir os dados de uma outra bas
 
 % Add a remind property so Nvim notify me when I open it about those tasks
 
-.state   done
-.date    2026-03-12 21:33:13-03:00
+.state done
+.date 2026-03-12 21:33:13-03:00
 .tags
 
 % Versioning wodo database files
 
-.state   done
-.date    2026-03-12 21:33:48-03:00
+.state done
+.date 2026-03-12 21:33:48-03:00
 .tags
 
 Makes the first byte identify the file version, so I can handle different file versions without breaking it.

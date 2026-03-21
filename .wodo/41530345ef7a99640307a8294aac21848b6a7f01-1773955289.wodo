@@ -32,3 +32,4 @@ But at the same time I'm thinking about git conflicts.
 - **Should we have some kind of tree navigator for the workspaces and the tasks?** This would be very nice. That's a very good idea.
 - Should we, for every tasks file, have it's own directory? So we can store assets and whatelse we need. And maybe create a syntax to reference them?
 - By the way, should it even render images? What about just referencing them? and then having some kind of map that opens it in an external tool?
+

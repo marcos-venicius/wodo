@@ -4,7 +4,7 @@
 
 _Wodo_ is a vim-based task management system.
 
-<img width="1289" height="842" alt="image" src="https://github.com/user-attachments/assets/a1ec1ffc-6963-4435-a1fa-f447c83f7e6e" />
+![](./assets/syntax-basic-example.png)
 
 > [!WARNING]
 > **It's currently in development, it may have some bugs**
