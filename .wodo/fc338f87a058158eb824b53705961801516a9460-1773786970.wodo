@@ -1,3 +1,27 @@
+% Create a proper filter "language"
+
+.state todo
+.date 2026-03-21 08:33:11-03:00
+.tags
+.remind
+
+The idea is to have a very simple syntax where you will be able to filter tasks.
+
+Example:
+
+```
+(state eq todo and tags contains wodo) or remind eq true
+```
+
+I have a project in golang called [Quang](https://github.com/marcos-venicius/quang).
+Is it possible to use golang inside C? I mean, bind it somehow?
+Because if we can, I'm thinking about using this library and just update the library if it needs to.
+If it's not possible to use it (not just possible, to be fair, if it's to hack-ish), we are going
+to implement a new query lang library in C ourselfs.
+
+And, if I need to implement a new query lang library, I'm gonna do it a header only library, so it's easy to
+use it wherever we want, and of course, the first use will be the wodo project.
+
 % Make parse and format command accept the tasks file format via stdin
 
 .state done
